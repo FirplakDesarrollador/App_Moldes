@@ -6,11 +6,10 @@ import { Search, Lock, Loader2, User, Settings, Check, ChevronDown } from 'lucid
 
 interface Employee {
     Cedula: number
-    NombreCompleto: string
-    'Puesta activo': string // Keeping the column name as per provided schema
-    Planta: string
-    Area: string
-    Empresa: string
+    Nombre: string
+    Planta?: string
+    Area?: string
+    Empresa?: string
 }
 
 export default function AuthForm() {
@@ -29,14 +28,11 @@ export default function AuthForm() {
         const fetchEmployees = async () => {
             console.log('--- Debug de Conexión ---')
             console.log('URL de Supabase configurada:', !!process.env.NEXT_PUBLIC_SUPABASE_URL)
-            console.log('Tabla destino:', 'Datos personal completa')
-
             try {
-                // Simplifying the query: No extra quotes, let Supabase JS handle it
                 const { data, error } = await supabase
-                    .from('Datos personal completa')
-                    .select('NombreCompleto, Cedula, Planta, Area, Empresa')
-                    .order('NombreCompleto', { ascending: true })
+                    .from('Personal app moldes')
+                    .select('Nombre, Cedula')
+                    .order('Nombre', { ascending: true })
                     .limit(1000)
 
                 if (error) {
@@ -49,7 +45,7 @@ export default function AuthForm() {
                         setMessage('') // Clear any previous error
                     } else {
                         console.warn('La tabla está vacía o bloqueada por RLS.')
-                        setMessage('Acceso bloqueado: Activa Permisos (RLS) en Supabase para "Datos personal completa".')
+                        setMessage('Acceso bloqueado: Activa Permisos (RLS) en Supabase para "Personal app moldes".')
                     }
                 }
             } catch (err: any) {
@@ -68,7 +64,7 @@ export default function AuthForm() {
             setFilteredEmployees(employees)
         } else {
             const filtered = employees.filter(emp => {
-                const name = emp.NombreCompleto || ''
+                const name = emp.Nombre || ''
                 return name.toLowerCase().includes(searchQuery.toLowerCase())
             })
             setFilteredEmployees(filtered)
@@ -139,7 +135,7 @@ export default function AuthForm() {
                             className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-12 pr-10 text-white cursor-pointer flex items-center justify-between min-h-[50px]"
                         >
                             <span className={selectedEmployee ? 'text-white' : 'text-gray-600'}>
-                                {selectedEmployee ? selectedEmployee.NombreCompleto : 'Busca tu nombre...'}
+                                {selectedEmployee ? selectedEmployee.Nombre : 'Busca tu nombre...'}
                             </span>
                             <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
                         </div>
@@ -173,8 +169,8 @@ export default function AuthForm() {
                                                 className="flex items-center justify-between px-4 py-3 hover:bg-blue-600/20 rounded-lg cursor-pointer transition-colors group"
                                             >
                                                 <div>
-                                                    <p className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors">{emp.NombreCompleto || 'Sin Nombre'}</p>
-                                                    <p className="text-[10px] text-gray-500 uppercase tracking-tighter">{emp.Planta} — {emp.Area}</p>
+                                                    <p className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors">{emp.Nombre || 'Sin Nombre'}</p>
+                                                    <p className="text-[10px] text-gray-500 uppercase tracking-tighter">{emp.Planta || 'MOLDES'} — {emp.Area || 'EXTERNO'}</p>
                                                 </div>
                                                 {selectedEmployee?.Cedula === emp.Cedula && (
                                                     <Check className="w-4 h-4 text-blue-500" />

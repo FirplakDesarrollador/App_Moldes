@@ -53,7 +53,7 @@ export default function DashboardPage() {
 
                     <div className="flex items-center gap-8">
                         <div className="hidden lg:flex flex-col items-end text-right">
-                            <span className="text-sm font-bold text-white leading-none mb-1">{user?.NombreCompleto}</span>
+                            <span className="text-sm font-bold text-white leading-none mb-1">{user?.Nombre || user?.NombreCompleto}</span>
                             <span className="text-[10px] text-gray-500 uppercase flex items-center gap-1">
                                 <MapPin className="w-3 h-3 text-blue-500" /> {user?.Planta || 'Sin Planta'}
                             </span>
@@ -72,13 +72,13 @@ export default function DashboardPage() {
             <div className="max-w-7xl mx-auto px-6 py-16">
                 <div className="max-w-4xl mx-auto text-center mb-16 space-y-6">
                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 text-[10px] font-bold uppercase tracking-widest animate-in fade-in slide-in-from-top-4 duration-1000">
-                        <CheckCircle2 className="w-3 h-3" /> Sistema Activo — {user?.Empresa}
+                        <CheckCircle2 className="w-3 h-3" /> Sistema Activo — {user?.Empresa || 'Firplak'}
                     </div>
                     <h1 className="text-6xl font-black tracking-tight text-white leading-[1.1]">
                         Panel de <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">Gestión</span>
                     </h1>
                     <p className="text-gray-500 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
-                        Bienvenido, <span className="text-white font-medium">{user?.NombreCompleto}</span>. Tienes acceso a la base de datos de moldes de la planta <span className="text-blue-400 font-bold uppercase">{user?.Planta}</span>.
+                        Bienvenido, <span className="text-white font-medium">{user?.Nombre || user?.NombreCompleto}</span>. Tienes acceso a la base de datos de moldes de la planta <span className="text-blue-400 font-bold uppercase">{user?.Planta || 'Principal'}</span>.
                     </p>
                 </div>
 
