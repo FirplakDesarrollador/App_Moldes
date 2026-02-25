@@ -25,8 +25,14 @@ export default function MoldsModule() {
         try {
             const data = await moldsService.getActiveMolds()
             setMolds(data)
-        } catch (error) {
-            console.error(error)
+        } catch (error: any) {
+            console.error('Error loading molds:', {
+                message: error.message,
+                code: error.code,
+                details: error.details,
+                hint: error.hint,
+                error
+            })
         } finally {
             setLoading(false)
         }
@@ -34,9 +40,9 @@ export default function MoldsModule() {
 
     const filteredMolds = molds.filter(m => {
         const matchesSearch =
-            m.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            m.codigo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            m.defectos.some(d => d.toLowerCase().includes(searchQuery.toLowerCase()))
+            (m.nombre || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (m.codigo || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (m.defectos || []).some(d => d.toLowerCase().includes(searchQuery.toLowerCase()))
 
         const matchesIntervention = interventionFilter === 'Todos' || m.tipo_reparacion === interventionFilter
         const matchesStatus = statusFilter === 'Todos' || m.estado === statusFilter

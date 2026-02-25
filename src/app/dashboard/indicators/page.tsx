@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, User, LogOut, Package, ClipboardList, TrendingUp, Settings, Activity, Calendar, Filter, Loader2, Target, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Package, ClipboardList, TrendingUp, Activity, Calendar, Filter, Loader2, Target, CheckCircle2, AlertCircle } from 'lucide-react'
 import { indicatorsService, IndicatorData } from '@/services/indicators.service'
+import Navbar from '@/components/layout/Navbar'
 
 export default function IndicatorsPage() {
     const router = useRouter()
@@ -46,30 +47,15 @@ export default function IndicatorsPage() {
         return 'text-red-500'
     }
 
-    const handleLogout = () => {
-        localStorage.removeItem('moldapp_user')
-        router.push('/login')
-    }
-
     return (
         <div className="min-h-screen bg-[#050505] text-white">
-            <nav className="fixed top-0 left-0 right-0 z-50 bg-black/60 backdrop-blur-xl border-b border-white/5">
-                <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-                    <div className="flex items-center gap-8">
-                        <button onClick={() => router.push('/dashboard')} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors group">
-                            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-                            <span className="font-medium text-sm">Volver al Panel</span>
-                        </button>
-                        <div className="h-6 w-[1px] bg-white/10" />
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-green-600/20 flex items-center justify-center border border-green-500/30">
-                                <TrendingUp className="w-4 h-4 text-green-400" />
-                            </div>
-                            <span className="font-black tracking-tighter text-xl text-white">MoldApp <span className="text-green-500">Analytics</span></span>
-                        </div>
-                    </div>
-                </div>
-            </nav>
+            <Navbar
+                user={user}
+                showBackButton
+                backPath="/dashboard"
+                title="Indicadores"
+                subtitle="Analytics de Gestión"
+            />
 
             <main className="pt-32 pb-20 px-6 max-w-7xl mx-auto">
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">

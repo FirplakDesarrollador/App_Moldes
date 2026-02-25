@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, User, LogOut, Package, ClipboardList, TrendingUp, Settings, Activity, CheckCircle2, ChevronDown, Save, Loader2, Search, X, MessageSquare } from 'lucide-react'
+import { Package, ClipboardList, TrendingUp, Activity, CheckCircle2, ChevronDown, Save, Loader2, Search, X, MessageSquare } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { auditService, AuditRecord } from '@/services/audit.service'
+import Navbar from '@/components/layout/Navbar'
 
 const AUDIT_QUESTIONS = [
     {
@@ -160,11 +161,6 @@ export default function AuditPage() {
         }
     }
 
-    const handleLogout = () => {
-        localStorage.removeItem('moldapp_user')
-        router.push('/login')
-    }
-
     if (loading) return (
         <div className="min-h-screen bg-[#050505] flex items-center justify-center">
             <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
@@ -173,23 +169,13 @@ export default function AuditPage() {
 
     return (
         <div className="min-h-screen bg-[#050505] text-white">
-            <nav className="fixed top-0 left-0 right-0 z-50 bg-black/60 backdrop-blur-xl border-b border-white/5">
-                <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-                    <div className="flex items-center gap-8">
-                        <button onClick={() => router.push('/dashboard')} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors group">
-                            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-                            <span className="font-medium text-sm">Volver al Panel</span>
-                        </button>
-                        <div className="h-6 w-[1px] bg-white/10" />
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-blue-600/20 flex items-center justify-center border border-blue-500/30">
-                                <Activity className="w-4 h-4 text-blue-500" />
-                            </div>
-                            <span className="font-black tracking-tighter text-xl">MoldApp <span className="text-blue-500">Audit</span></span>
-                        </div>
-                    </div>
-                </div>
-            </nav>
+            <Navbar
+                user={user}
+                showBackButton
+                backPath="/dashboard"
+                title="Auditoría"
+                subtitle="Control de Calidad"
+            />
 
             <main className="pt-32 pb-20 px-6 max-w-5xl mx-auto">
                 <div className="space-y-8">
