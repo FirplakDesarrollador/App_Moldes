@@ -38,7 +38,20 @@ interface MoldDetailsProps {
 }
 
 export default function MoldDetails({ mold, onClose }: MoldDetailsProps) {
-    const sections = [
+    interface SectionItem {
+        label: string
+        value: string | number | undefined
+        icon?: any
+        unit?: string
+    }
+
+    interface Section {
+        title: string
+        icon: any
+        items: SectionItem[]
+    }
+
+    const sections: Section[] = [
         {
             title: 'Información General',
             icon: Info,
