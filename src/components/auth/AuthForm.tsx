@@ -6,11 +6,7 @@ import { Search, Lock, Loader2, User, Settings, Check, ChevronDown } from 'lucid
 
 interface Employee {
     Cedula: number
-    NombreCompleto: string
-    'Puesta activo': string // Keeping the column name as per provided schema
-    Planta: string
-    Area: string
-    Empresa: string
+    Nombre: string
 }
 
 export default function AuthForm() {
@@ -29,15 +25,14 @@ export default function AuthForm() {
         const fetchEmployees = async () => {
             console.log('--- Debug de Conexión ---')
             console.log('URL de Supabase configurada:', !!process.env.NEXT_PUBLIC_SUPABASE_URL)
-            console.log('Tabla destino:', 'Datos personal completa')
+            console.log('Tabla destino:', 'Personal app moldes')
 
             try {
                 // Simplifying the query: No extra quotes, let Supabase JS handle it
                 const { data, error } = await supabase
-                    .from('Datos personal completa')
-                    .select('NombreCompleto, Cedula, Planta, Area, Empresa')
-                    .order('NombreCompleto', { ascending: true })
-                    .limit(1000)
+                    .from('Personal app moldes')
+                    .select('Nombre, Cedula')
+                    .order('Nombre', { ascending: true })
 
                 if (error) {
                     console.error('Error al cargar personal:', error)
@@ -49,7 +44,7 @@ export default function AuthForm() {
                         setMessage('') // Clear any previous error
                     } else {
                         console.warn('La tabla está vacía o bloqueada por RLS.')
-                        setMessage('Acceso bloqueado: Activa Permisos (RLS) en Supabase para "Datos personal completa".')
+                        setMessage('Acceso bloqueado: Activa Permisos (RLS) en Supabase para "Personal app moldes".')
                     }
                 }
             } catch (err: any) {
@@ -68,7 +63,7 @@ export default function AuthForm() {
             setFilteredEmployees(employees)
         } else {
             const filtered = employees.filter(emp => {
-                const name = emp.NombreCompleto || ''
+                const name = emp.Nombre || ''
                 return name.toLowerCase().includes(searchQuery.toLowerCase())
             })
             setFilteredEmployees(filtered)
@@ -121,12 +116,26 @@ export default function AuthForm() {
 
     return (
         <div className="w-full max-w-md p-8 glass-card rounded-2xl animate-in fade-in duration-700">
-            <div className="flex flex-col items-center mb-8">
-                <div className="w-16 h-16 bg-blue-600/20 rounded-full flex items-center justify-center mb-4 border border-blue-500/30">
-                    <Settings className="w-8 h-8 text-blue-500 animate-spin-slow" />
+            <div className="flex flex-col items-center mb-10 text-center">
+                <div className="h-16 w-full flex items-center justify-center mb-6">
+                    <img
+                        src="/logo-firplak.png"
+                        alt="Firplak Logo"
+                        className="h-full object-contain filter drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]"
+                        onError={(e) => {
+                            // Fallback if image not found
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.parentElement!.innerHTML = '<span class="text-4xl font-black tracking-tighter text-white">FIRPLAK</span>';
+                        }}
+                    />
                 </div>
-                <h1 className="text-3xl font-bold tracking-tight text-white mb-2">MoldApp</h1>
-                <p className="text-gray-400 text-sm italic">Acceso Personal Firplak</p>
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-blue-600/20 rounded-lg flex items-center justify-center border border-blue-500/30">
+                        <Settings className="w-4 h-4 text-blue-500 animate-spin-slow" />
+                    </div>
+                    <h1 className="text-xl font-bold tracking-tight text-white uppercase tracking-wider">MoldApp</h1>
+                </div>
+                <p className="text-gray-500 text-[10px] uppercase tracking-[0.3em] mt-3 font-semibold">Control Interno de Producción</p>
             </div>
 
             <form onSubmit={handleLogin} className="space-y-6">
@@ -139,7 +148,7 @@ export default function AuthForm() {
                             className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-12 pr-10 text-white cursor-pointer flex items-center justify-between min-h-[50px]"
                         >
                             <span className={selectedEmployee ? 'text-white' : 'text-gray-600'}>
-                                {selectedEmployee ? selectedEmployee.NombreCompleto : 'Busca tu nombre...'}
+                                {selectedEmployee ? selectedEmployee.Nombre : 'Busca tu nombre...'}
                             </span>
                             <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
                         </div>
@@ -173,8 +182,7 @@ export default function AuthForm() {
                                                 className="flex items-center justify-between px-4 py-3 hover:bg-blue-600/20 rounded-lg cursor-pointer transition-colors group"
                                             >
                                                 <div>
-                                                    <p className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors">{emp.NombreCompleto || 'Sin Nombre'}</p>
-                                                    <p className="text-[10px] text-gray-500 uppercase tracking-tighter">{emp.Planta} — {emp.Area}</p>
+                                                    <p className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors">{emp.Nombre || 'Sin Nombre'}</p>
                                                 </div>
                                                 {selectedEmployee?.Cedula === emp.Cedula && (
                                                     <Check className="w-4 h-4 text-blue-500" />
