@@ -26,35 +26,44 @@ export default function AuthForm() {
 
     useEffect(() => {
         const fetchEmployees = async () => {
+            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+            const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
             console.log('--- Debug de Conexión ---')
-            console.log('URL de Supabase configurada:', !!process.env.NEXT_PUBLIC_SUPABASE_URL)
-            console.log('Tabla destino:', 'Personal app moldes')
+            console.log('URL de Supabase:', supabaseUrl ? 'Configurada ✅' : 'FALTANTE ❌')
+            console.log('Key de Supabase:', supabaseKey ? 'Configurada ✅' : 'FALTANTE ❌')
+
+            if (!supabaseUrl || !supabaseKey) {
+                setMessage('Error: Variables de entorno de Supabase no configuradas (.env.local missing?)')
+                setInitialLoading(false)
+                return
+            }
 
             try {
-                const { data, error } = await supabase
+                // Timeout de 6 segundos para no colgar la UI si la red falla
+                const timeout = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Tiempo de espera agotado (Timeout)')), 6000)
+                )
+
+                const fetchTask = supabase
                     .from('Personal app moldes')
                     .select('Nombre, Cedula')
                     .order('Nombre', { ascending: true })
                     .limit(1000)
 
+                const { data, error } = await Promise.race([fetchTask, timeout]) as any
+
                 if (error) {
                     console.error('Error al cargar personal:', error)
                     setMessage(`Error de Supabase: ${error.message} (${error.code})`)
                 } else if (data) {
-                    if (data.length > 0) {
-                        console.log('Personal cargado exitosamente:', data.length, 'registros')
-                        setEmployees(data as any)
-                        setMessage('') // Clear any previous error
-                    } else {
-                        console.warn('La tabla está vacía o bloqueada por RLS.')
-                        setMessage('Acceso bloqueado: Activa Permisos (RLS) en Supabase para "Personal app moldes".')
-                    }
+                    console.log('Personal cargado:', data.length, 'registros')
+                    setEmployees(data)
                 }
             } catch (err: any) {
                 console.error('Error fatal durante la carga:', err)
-                setMessage(`Falla de red o de sistema: ${err.message}`)
+                setMessage(`Error de conexión: ${err.message}. Verifica tu internet o la URL de Supabase.`)
             } finally {
-                console.log('Carga inicial finalizada.')
                 setInitialLoading(false)
             }
         }
