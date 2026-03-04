@@ -1,0 +1,4 @@
+﻿Checking tables...
+Personal app moldes: Count: 12
+Datos personal completa: Count: 0
+Personal sample: [ { Nombre: 'Yurany Andrea Ortiz Torres' } ]
