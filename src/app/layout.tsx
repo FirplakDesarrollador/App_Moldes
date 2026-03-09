@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { SAPProvider } from "@/context/SAPContext";
+import SAPStatusHeader from "@/components/SAPStatusHeader";
 
 export const metadata: Metadata = {
     title: "MoldApp - Login",
@@ -14,7 +16,9 @@ export default function RootLayout({
     return (
         <html lang="es">
             <body className="antialiased premium-gradient min-h-screen">
-                {children}
+                <SAPProvider>
+                    {children}
+                </SAPProvider>
             </body>
         </html>
     );

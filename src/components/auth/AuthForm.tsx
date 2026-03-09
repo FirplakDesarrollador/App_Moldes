@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Search, Lock, Loader2, User, Settings, Check, ChevronDown } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useSAP } from '@/context/SAPContext'
 
 interface Employee {
     Cedula: number
@@ -13,6 +15,8 @@ interface Employee {
 }
 
 export default function AuthForm() {
+    const router = useRouter()
+    const { loginToSAP } = useSAP()
     const [employees, setEmployees] = useState<Employee[]>([])
     const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([])
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
@@ -82,7 +86,7 @@ export default function AuthForm() {
         }
     }, [searchQuery, employees])
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!selectedEmployee) {
             setMessage('Por favor, selecciona tu nombre de la lista.')
@@ -94,7 +98,11 @@ export default function AuthForm() {
 
         if (cedulaInput === selectedEmployee.Cedula?.toString()) {
             localStorage.setItem('moldapp_user', JSON.stringify(selectedEmployee))
-            window.location.href = '/dashboard'
+
+            // Initiate SAP Login
+            await loginToSAP()
+
+            router.push('/dashboard')
         } else {
             setMessage('Cédula incorrecta. Intenta de nuevo.')
             setLoading(false)
