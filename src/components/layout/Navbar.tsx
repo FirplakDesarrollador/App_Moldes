@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, LogOut, Settings, User, MapPin } from 'lucide-react'
+import SAPSessionBadge from '@/components/auth/SAPSessionBadge'
 
 interface NavbarProps {
     user: any
@@ -63,6 +64,8 @@ export default function Navbar({
                 </div>
 
                 <div className="flex items-center gap-4 md:gap-8">
+                    <SAPSessionBadge />
+
                     <div className="hidden sm:flex flex-col items-end text-right">
                         <span className="text-sm font-bold text-white leading-none mb-1">{user?.Nombre || user?.NombreCompleto || 'Usuario'}</span>
                         <span className="text-[10px] text-gray-500 uppercase flex items-center gap-1">

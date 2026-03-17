@@ -1,43 +1,74 @@
 import { createClient } from '@/lib/supabase'
 import { MoldActive } from './molds.service'
 
-export interface IndicatorData {
+export interface IndicatorStats {
     totalComprometidas: number
-    totalEntregadas: number
+    totalEntregadasATiempo: number
+    totalPendientes: number
     nivelServicio: number
+    desglosePorCategoria: Record<string, number>
     detalles: MoldActive[]
 }
 
 export const indicatorsService = {
-    async getIndicatorStats(dateRange: { start: string, end: string }, type?: string): Promise<IndicatorData> {
+    async getKPIs(dateRange: { start: string, end: string }, classification?: string): Promise<IndicatorStats> {
         const supabase = createClient()
 
         let query = supabase
-            .from('moldes_activos')
+            .from('Base_datos_moldes_dinámica')
             .select('*')
-            .gte('fecha_entrega_esperada', dateRange.start)
-            .lte('fecha_entrega_esperada', dateRange.end)
-
-        if (type) {
-            query = query.eq('tipo_reparacion', type)
-        }
+            .gte('FECHA ESPERADA', dateRange.start)
+            .lte('FECHA ESPERADA', dateRange.end)
 
         const { data, error } = await query
         if (error) throw error
 
         const molds = data as MoldActive[]
 
-        // Logic for "delivered" needs to be defined based on status
-        const entregadas = molds.filter(m => m.estado === 'En espera en producción' || m.estado === 'Destruido')
+        // Entregados a tiempo: FECHA ENTREGA <= FECHA ESPERADA
+        const entregadasATiempo = molds.filter(m => {
+            if (!m["FECHA ENTREGA"]) return false
+            const entrega = new Date(m["FECHA ENTREGA"])
+            const esperada = new Date(m["FECHA ESPERADA"])
+            return entrega <= esperada
+        })
+
+        const pendientes = molds.filter(m => !m["FECHA ENTREGA"] || m["ESTADO"] !== 'ENTREGADO')
 
         const totalComprometidas = molds.length
-        const totalEntregadas = entregadas.length
-        const nivelServicio = totalComprometidas > 0 ? (totalEntregadas / totalComprometidas) * 100 : 0
+        const totalEntregadasATiempo = entregadasATiempo.length
+        const totalPendientes = pendientes.length
+        const nivelServicio = totalComprometidas > 0 ? (totalEntregadasATiempo / totalComprometidas) * 100 : 0
+
+        // Desglose por categoría
+        const categorias = {
+            'REPARACION_RAPIDA': 0,
+            'REPARACION_ESPECIAL': 0,
+            'MOLDE_NUEVO': 0,
+            'MODELO_NUEVO': 0
+        }
+
+        molds.forEach(m => {
+            const tipo = (m["Tipo de reparacion"] || '').toUpperCase().trim()
+            const defecto = (m["DEFECTOS A REPARAR"] || '').toUpperCase().trim()
+
+            if (defecto === 'MOLDE NUEVO') {
+                categorias['MOLDE_NUEVO']++
+            } else if (tipo === 'REPARACIÓN RÁPIDA') {
+                categorias['REPARACION_RAPIDA']++
+            } else if (tipo === 'REPARACIÓN ESPECIAL') {
+                categorias['REPARACION_ESPECIAL']++
+            } else if (tipo === 'MODELO NUEVO') {
+                categorias['MODELO_NUEVO']++
+            }
+        })
 
         return {
             totalComprometidas,
-            totalEntregadas,
+            totalEntregadasATiempo,
+            totalPendientes,
             nivelServicio,
+            desglosePorCategoria: categorias as any,
             detalles: molds
         }
     }

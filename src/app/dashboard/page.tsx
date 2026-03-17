@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import MoldSearch from '@/components/molds/MoldSearch'
 import MoldDetails from '@/components/molds/MoldDetails'
 import Navbar from '@/components/layout/Navbar'
+import SAPSessionBadge from '@/components/auth/SAPSessionBadge'
 import { Settings, Briefcase, Factory, CheckCircle2, TrendingUp } from 'lucide-react'
 
 export default function DashboardPage() {
@@ -42,9 +43,6 @@ export default function DashboardPage() {
 
             <div className="max-w-7xl mx-auto px-6 py-12">
                 <div className="max-w-4xl mx-auto text-center mb-12 space-y-4">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 text-[10px] font-bold uppercase tracking-widest animate-in fade-in slide-in-from-top-4 duration-1000">
-                        <CheckCircle2 className="w-3 h-3" /> Sistema Activo — {user?.Empresa || 'Firplak'}
-                    </div>
                     <h1 className="text-5xl font-black tracking-tight text-white leading-[1.1]">
                         Panel de <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 font-extrabold">Control</span>
                     </h1>
@@ -119,6 +117,10 @@ export default function DashboardPage() {
                 <MoldDetails
                     mold={selectedMold}
                     onClose={() => setSelectedMold(null)}
+                    onEdit={(mold) => {
+                        console.log('Edit mold:', mold);
+                        // Future implementation for editing
+                    }}
                 />
             )}
         </main>

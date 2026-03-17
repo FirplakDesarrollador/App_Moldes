@@ -11,8 +11,9 @@ export default function LoginPage() {
 
             <AuthForm />
 
-            <p className="mt-8 text-gray-500 text-xs">
-                &copy; 2026 MoldApp. Todos los derechos reservados.
+            <p className="mt-8 text-gray-400 text-xs flex items-center gap-2">
+                <span>&copy; 2026 MoldApp. Todos los derechos reservados.</span>
+                <span className="bg-gray-800 px-2 py-0.5 rounded-full border border-gray-700 text-[10px] font-medium">V2</span>
             </p>
         </main>
     )
