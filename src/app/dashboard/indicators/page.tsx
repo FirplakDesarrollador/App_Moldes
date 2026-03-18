@@ -47,7 +47,7 @@ export default function IndicatorsPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#050505] text-white">
+        <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
             <Navbar
                 user={user}
                 showBackButton
@@ -60,13 +60,13 @@ export default function IndicatorsPage() {
                 <div className="space-y-8 animate-in fade-in duration-700">
 
                     {/* Filters Bar */}
-                    <div className="p-8 glass-card rounded-[2.5rem] border border-white/5 flex flex-col md:flex-row items-center justify-between gap-6 backdrop-blur-3xl">
+                    <div className="p-8 glass-card rounded-[2.5rem] border border-black/5 dark:border-white/5 flex flex-col md:flex-row items-center justify-between gap-6 backdrop-blur-3xl">
                         <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-4">Desde</label>
                                 <input
                                     type="date"
-                                    className="bg-white/5 border border-white/10 rounded-2xl py-3 px-6 text-xs font-bold text-white focus:ring-2 focus:ring-blue-500/50 outline-none"
+                                    className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl py-3 px-6 text-xs font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/50 outline-none"
                                     value={dateRange.start}
                                     onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
                                 />
@@ -75,7 +75,7 @@ export default function IndicatorsPage() {
                                 <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-4">Hasta</label>
                                 <input
                                     type="date"
-                                    className="bg-white/5 border border-white/10 rounded-2xl py-3 px-6 text-xs font-bold text-white focus:ring-2 focus:ring-blue-500/50 outline-none"
+                                    className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl py-3 px-6 text-xs font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/50 outline-none"
                                     value={dateRange.end}
                                     onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
                                 />
@@ -102,11 +102,11 @@ export default function IndicatorsPage() {
 
                             {/* Left Column: Gauge & Main stats */}
                             <div className="xl:col-span-1 space-y-8">
-                                <div className="p-10 glass-card rounded-[3rem] border border-white/5 flex flex-col items-center justify-center text-center space-y-8 bg-black/40">
-                                    <h3 className="text-xs font-black uppercase tracking-[0.3em] text-gray-400">Nivel de Servicio</h3>
+                                <div className="p-10 glass-card rounded-[3rem] border border-black/5 dark:border-white/5 flex flex-col items-center justify-center text-center space-y-8 bg-black/5 dark:bg-black/40">
+                                    <h3 className="text-xs font-black uppercase tracking-[0.3em] text-gray-500 dark:text-gray-400">Nivel de Servicio</h3>
                                     <div className="relative w-56 h-56 flex items-center justify-center">
                                         <svg className="w-full h-full -rotate-90">
-                                            <circle cx="112" cy="112" r="95" className="stroke-white/5 fill-none" strokeWidth="16" />
+                                            <circle cx="112" cy="112" r="95" className="stroke-black/5 dark:stroke-white/5 fill-none" strokeWidth="16" />
                                             <circle
                                                 cx="112" cy="112" r="95"
                                                 className={`fill-none transition-all duration-1000 ${getGaugeColor(stats.nivelServicio).replace('text-', 'stroke-')}`}
@@ -121,21 +121,21 @@ export default function IndicatorsPage() {
                                             <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest mt-2">Cumplimiento</span>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2 px-6 py-2 bg-green-500/10 rounded-full border border-green-500/20 text-green-400">
+                                    <div className="flex items-center gap-2 px-6 py-2 bg-green-500/10 rounded-full border border-green-500/20 text-green-500 dark:text-green-400">
                                         <Target className="w-4 h-4" />
                                         <span className="text-[10px] font-black uppercase tracking-widest">Meta Corporativa: 95%</span>
                                     </div>
                                 </div>
 
-                                <div className="p-8 glass-card rounded-[2.5rem] border border-white/5 space-y-6">
+                                <div className="p-8 glass-card rounded-[2.5rem] border border-black/5 dark:border-white/5 space-y-6">
                                     <div className="flex items-center justify-between">
                                         <div className="p-3 bg-blue-500/10 rounded-2xl border border-blue-500/20">
-                                            <CheckCircle2 className="w-6 h-6 text-blue-400" />
+                                            <CheckCircle2 className="w-6 h-6 text-blue-500 dark:text-blue-400" />
                                         </div>
-                                        <span className="text-4xl font-black">{stats.totalEntregadasATiempo}</span>
+                                        <span className="text-4xl font-black text-slate-900 dark:text-white">{stats.totalEntregadasATiempo}</span>
                                     </div>
                                     <div>
-                                        <p className="text-xs font-black uppercase tracking-widest text-white">Entregados a Tiempo</p>
+                                        <p className="text-xs font-black uppercase tracking-widest text-slate-700 dark:text-gray-300">Entregados a Tiempo</p>
                                         <p className="text-[10px] text-gray-500 font-medium">De {stats.totalComprometidas} moldes totales programados para este periodo.</p>
                                     </div>
                                 </div>
@@ -146,15 +146,15 @@ export default function IndicatorsPage() {
                                 {/* Categories Grid */}
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     {Object.entries(stats.desglosePorCategoria).map(([cat, val], idx) => (
-                                        <div key={idx} className="p-6 glass-card rounded-3xl border border-white/5 space-y-4 hover:border-blue-500/30 transition-all group">
-                                            <div className="text-3xl font-black group-hover:text-blue-500 transition-colors">{val}</div>
-                                            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest leading-tight">{cat.replace(/_/g, ' ')}</p>
+                                        <div key={idx} className="p-6 glass-card rounded-3xl border border-black/5 dark:border-white/5 space-y-4 hover:border-blue-500/30 transition-all group">
+                                            <div className="text-3xl font-black text-slate-900 dark:text-white group-hover:text-blue-500 transition-colors">{val}</div>
+                                            <p className="text-[8px] font-black text-slate-500 dark:text-gray-500 uppercase tracking-widest leading-tight">{cat.replace(/_/g, ' ')}</p>
                                         </div>
                                     ))}
                                 </div>
 
                                 {/* Detailed Table */}
-                                <div className="p-8 glass-card rounded-[2.5rem] border border-white/5 min-h-[500px]">
+                                <div className="p-8 glass-card rounded-[2.5rem] border border-black/5 dark:border-white/5 min-h-[500px]">
                                     <div className="flex items-center justify-between mb-8">
                                         <h3 className="text-xl font-black flex items-center gap-3">
                                             <BarChart3 className="w-6 h-6 text-blue-500" /> Trazabilidad de Cumplimiento
@@ -167,34 +167,34 @@ export default function IndicatorsPage() {
                                     <div className="overflow-x-auto min-w-full">
                                         <table className="w-full text-left">
                                             <thead>
-                                                <tr className="border-b border-white/10">
-                                                    <th className="py-4 px-2 text-[10px] font-black text-gray-500 uppercase tracking-widest">Molde</th>
-                                                    <th className="py-4 px-2 text-[10px] font-black text-gray-500 uppercase tracking-widest">F. Esperada</th>
-                                                    <th className="py-4 px-2 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">Estatus</th>
-                                                    <th className="py-4 px-2 text-[10px] font-black text-gray-500 uppercase tracking-widest text-right">On-Time</th>
+                                                <tr className="border-b border-black/10 dark:border-white/10">
+                                                    <th className="py-4 px-2 text-[10px] font-black text-slate-600 dark:text-gray-400 uppercase tracking-widest">Molde</th>
+                                                    <th className="py-4 px-2 text-[10px] font-black text-slate-600 dark:text-gray-400 uppercase tracking-widest">F. Esperada</th>
+                                                    <th className="py-4 px-2 text-[10px] font-black text-slate-600 dark:text-gray-400 uppercase tracking-widest text-center">Estatus</th>
+                                                    <th className="py-4 px-2 text-[10px] font-black text-slate-600 dark:text-gray-400 uppercase tracking-widest text-right">On-Time</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-white/5">
+                                            <tbody className="divide-y divide-black/5 dark:divide-white/5">
                                                 {stats.detalles.map((m, i) => {
-                                                    const entrega = m["FECHA ENTREGA"] ? new Date(m["FECHA ENTREGA"]) : null
-                                                    const esperada = new Date(m["FECHA ESPERADA"])
+                                                    const entrega = m.Fecha_de_entrega ? new Date(m.Fecha_de_entrega) : null
+                                                    const esperada = new Date(m.Fecha_esperada)
                                                     const onTime = entrega && entrega <= esperada
 
                                                     return (
-                                                        <tr key={i} className="hover:bg-white/[0.02] transition-colors group">
+                                                        <tr key={i} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors group">
                                                             <td className="py-4 px-2">
-                                                                <p className="text-xs font-black text-white group-hover:text-blue-400 transition-colors uppercase">{m.Título}</p>
-                                                                <p className="text-[10px] font-mono text-gray-600">{m["CODIGO MOLDE"]}</p>
+                                                                <p className="text-xs font-black text-slate-900 dark:text-white group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors uppercase">{m.nombre_articulo}</p>
+                                                                <p className="text-[10px] font-mono text-gray-500 dark:text-gray-600">{m.serial}</p>
                                                             </td>
                                                             <td className="py-4 px-2 text-xs font-medium text-gray-400">
                                                                 {esperada.toLocaleDateString()}
                                                             </td>
                                                             <td className="py-4 px-2 text-center">
-                                                                <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border ${m.ESTADO?.includes('ENTREGADO')
+                                                                <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border ${m.estado?.includes('ENTREGADO')
                                                                         ? 'bg-green-500/10 text-green-500 border-green-500/20'
                                                                         : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
                                                                     }`}>
-                                                                    {m.ESTADO || 'PROCESO'}
+                                                                    {m.estado || 'PROCESO'}
                                                                 </span>
                                                             </td>
                                                             <td className="py-4 px-2 text-right">

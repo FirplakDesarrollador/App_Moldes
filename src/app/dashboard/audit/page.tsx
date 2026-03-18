@@ -109,14 +109,14 @@ export default function AuditPage() {
         }
         setSearchingMolds(true)
         const { data } = await supabase
-            .from('Base_datos_moldes_dinámica')
+            .from('moldes')
             .select('*')
-            .or(`Título.ilike.%${query}%, "CODIGO MOLDE".ilike.%${query}%`)
+            .or(`nombre_articulo.ilike.%${query}%, serial.ilike.%${query}%`)
             .limit(5)
 
         const unique = (data || []).reduce((acc: any[], current: any) => {
-            const code = current["CODIGO MOLDE"]
-            if (!acc.find(item => item["CODIGO MOLDE"] === code)) acc.push(current)
+            const code = current.serial
+            if (!acc.find(item => item.serial === code)) acc.push(current)
             return acc
         }, [])
 
@@ -149,7 +149,7 @@ export default function AuditPage() {
             const auditData: AuditData = {
                 auditor_id: user.Cedula,
                 auditor_nombre: user.Nombre || user.NombreCompleto,
-                id_molde: selectedMold["CODIGO MOLDE"],
+                id_molde: selectedMold.serial,
                 tablet_ok: auditState.tablet.ok,
                 tablet_op_id: auditState.tablet.op_id,
                 encerado_ok: auditState.encerado.ok,
@@ -202,14 +202,14 @@ export default function AuditPage() {
     }
 
     if (loading) return (
-        <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+        <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
             <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
         </div>
     )
 
     return (
-        <div className="min-h-screen bg-[#050505] text-white">
-            <Navbar user={user} showBackButton backPath="/dashboard" title="Auditoría" subtitle="PV_MOLDES V2.1" />
+        <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+            <Navbar user={user} showBackButton backPath="/dashboard" title="Auditoría" subtitle="PV_MOLDES V2.2" />
 
             <main className="pt-32 pb-28 px-4 max-w-6xl mx-auto">
                 <div className="space-y-8">
@@ -233,17 +233,17 @@ export default function AuditPage() {
                             </div>
                             <div>
                                 <h3 className="text-[10px] font-black text-blue-500 uppercase tracking-[0.4em] mb-1">Sesión de Auditoría Activa</h3>
-                                <p className="text-2xl font-black text-white uppercase tracking-tight">AUDITOR: {user?.Nombre || user?.NombreCompleto}</p>
+                                <p className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">AUDITOR: {user?.Nombre || user?.NombreCompleto}</p>
                             </div>
                         </div>
-                        <div className="bg-white/2 px-8 py-4 rounded-3xl border border-white/5 text-right">
-                            <p className="text-[10px] font-bold text-gray-600 uppercase tracking-[0.2em] mb-1">Base de Datos Personal</p>
-                            <p className="text-sm font-mono text-blue-400">({allPersonnel.length} operarios en línea)</p>
+                        <div className="bg-black/5 dark:bg-white/5 px-8 py-4 rounded-3xl border border-black/5 dark:border-white/5 text-right">
+                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] mb-1">Base de Datos Personal</p>
+                            <p className="text-sm font-mono text-blue-500 dark:text-blue-400">({allPersonnel.length} operarios en línea)</p>
                         </div>
                     </div>
 
                     {/* Search Mold Section */}
-                    <div className="p-10 glass-card rounded-[3rem] border border-white/5 space-y-6 relative overflow-hidden group">
+                    <div className="p-10 glass-card rounded-[3rem] border border-black/5 dark:border-white/5 space-y-6 relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-80 h-80 bg-blue-600/5 rounded-full blur-[100px] -mr-40 -mt-40 pointer-events-none group-hover:bg-blue-600/10 transition-all duration-1000" />
 
                         <div className="space-y-6 relative">
@@ -258,8 +258,8 @@ export default function AuditPage() {
                                 <input
                                     type="text"
                                     placeholder="Ingrese nombre o código del molde para buscar..."
-                                    className="w-full bg-white/[0.03] border border-white/10 rounded-[2rem] py-6 px-10 text-xl font-bold text-white focus:ring-4 focus:ring-blue-500/20 outline-none transition-all placeholder:text-gray-700"
-                                    value={selectedMold ? `${selectedMold.Título} [${selectedMold['CODIGO MOLDE']}]` : moldSearchQuery}
+                                    className="w-full bg-black/5 dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-[2rem] py-6 px-10 text-xl font-bold text-slate-900 dark:text-white focus:ring-4 focus:ring-blue-500/20 outline-none transition-all placeholder:text-gray-400 dark:placeholder:text-gray-700"
+                                    value={selectedMold ? `${selectedMold.nombre_articulo} [${selectedMold.serial}]` : moldSearchQuery}
                                     onChange={(e) => {
                                         setMoldSearchQuery(e.target.value)
                                         setSelectedMold(null)
@@ -269,23 +269,23 @@ export default function AuditPage() {
                                 {selectedMold && (
                                     <button
                                         onClick={() => { setSelectedMold(null); setMoldSearchQuery(''); setMoldResults([]) }}
-                                        className="absolute right-6 top-1/2 -translate-y-1/2 p-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-all"
+                                        className="absolute right-6 top-1/2 -translate-y-1/2 p-3 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-2xl transition-all"
                                     >
-                                        <X className="w-5 h-5 text-gray-400" />
+                                        <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
                                     </button>
                                 )}
                             </div>
 
                             {moldResults.length > 0 && !selectedMold && (
-                                <div className="absolute z-50 w-full mt-4 bg-[#0a0a0a] border border-white/10 rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+                                <div className="absolute z-50 w-full mt-4 bg-white dark:bg-[#0a0a0a] border border-black/10 dark:border-white/10 rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
                                     {moldResults.map((m, i) => (
                                         <div
                                             key={i}
                                             onClick={() => { setSelectedMold(m); setMoldResults([]) }}
-                                            className="p-6 hover:bg-blue-600/20 cursor-pointer border-b border-white/5 flex justify-between items-center transition-colors"
+                                            className="p-6 hover:bg-black/5 dark:hover:bg-blue-600/20 cursor-pointer border-b border-black/5 dark:border-white/5 flex justify-between items-center transition-colors"
                                         >
-                                            <span className="text-base font-black uppercase text-gray-300">{m.Título}</span>
-                                            <span className="text-[11px] font-mono text-blue-500/50 bg-blue-500/5 px-3 py-1 rounded-full">{m['CODIGO MOLDE']}</span>
+                                            <span className="text-base font-black uppercase text-slate-800 dark:text-gray-300">{m.nombre_articulo}</span>
+                                            <span className="text-[11px] font-mono text-blue-500 bg-blue-500/10 px-3 py-1 rounded-full">{m.serial}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -311,26 +311,26 @@ export default function AuditPage() {
                                         return (
                                             <div key={q.id} className="space-y-4">
                                                 {/* Card Row */}
-                                                <div className="flex flex-col lg:flex-row items-stretch gap-1 glass-card rounded-[2.5rem] border border-white/5 hover:border-blue-500/20 transition-all duration-500 relative group/row overflow-hidden">
+                                                <div className="flex flex-col lg:flex-row items-stretch gap-1 glass-card rounded-[2.5rem] border border-black/5 dark:border-white/5 hover:border-blue-500/20 transition-all duration-500 relative group/row overflow-hidden">
 
                                                     {/* Q Text (45%) */}
-                                                    <div className="lg:w-[45%] p-8 lg:p-10 lg:border-r border-white/5 flex flex-col justify-center bg-white/[0.01]">
-                                                        <div className="flex items-center gap-3 mb-2 opacity-50">
+                                                    <div className="lg:w-[45%] p-8 lg:p-10 lg:border-r border-black/5 dark:border-white/5 flex flex-col justify-center bg-black/[0.01] dark:bg-white/[0.01]">
+                                                        <div className="flex items-center gap-3 mb-2 opacity-70 dark:opacity-50">
                                                             <ClipboardList className="w-3 h-3" />
-                                                            <span className="text-[9px] font-black uppercase tracking-widest">Requisito de Auditoría</span>
+                                                            <span className="text-[9px] font-black uppercase tracking-widest text-slate-600 dark:text-white">Requisito de Auditoría</span>
                                                         </div>
-                                                        <p className="text-base font-bold text-white group-hover/row:text-blue-400 transition-colors leading-relaxed">{q.label}</p>
+                                                        <p className="text-base font-bold text-slate-900 dark:text-white group-hover/row:text-blue-500 dark:group-hover/row:text-blue-400 transition-colors leading-relaxed">{q.label}</p>
                                                     </div>
 
                                                     {/* Selector Sí/No (20%) */}
-                                                    <div className="lg:w-[20%] p-8 flex flex-col items-center justify-center border-b lg:border-b-0 lg:border-r border-white/5 bg-white/[0.02]">
-                                                        <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-4">¿Se cumple actualmente?</span>
+                                                    <div className="lg:w-[20%] p-8 flex flex-col items-center justify-center border-b lg:border-b-0 lg:border-r border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02]">
+                                                        <span className="text-[9px] font-black text-slate-500 dark:text-gray-500 uppercase tracking-widest mb-4">¿Se cumple actualmente?</span>
                                                         <button
                                                             onClick={() => setAuditState({
                                                                 ...auditState,
                                                                 [q.id]: { ...qState, ok: !qState.ok, touched: true }
                                                             })}
-                                                            className={`relative w-36 h-16 rounded-[1.25rem] p-1 transition-all duration-700 ${!qState.touched ? 'bg-white/5 border border-white/10' :
+                                                            className={`relative w-36 h-16 rounded-[1.25rem] p-1 transition-all duration-700 ${!qState.touched ? 'bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10' :
                                                                     qState.ok ? 'bg-green-600 shadow-[0_0_30px_rgba(22,163,74,0.3)]' : 'bg-red-600 shadow-[0_0_30px_rgba(220,38,38,0.25)]'
                                                                 }`}
                                                         >
@@ -344,7 +344,7 @@ export default function AuditPage() {
                                                                     {qState.ok ? 'SÍ' : 'NO'}
                                                                 </span>
                                                             )}
-                                                            {!qState.touched && <span className="absolute inset-0 flex items-center justify-center text-[9px] font-black text-white/20 animate-pulse uppercase tracking-tighter">SIN MARCAR</span>}
+                                                            {!qState.touched && <span className="absolute inset-0 flex items-center justify-center text-[9px] font-black text-slate-500 dark:text-white/20 animate-pulse uppercase tracking-tighter">SIN MARCAR</span>}
                                                         </button>
                                                     </div>
 
@@ -352,11 +352,11 @@ export default function AuditPage() {
                                                     <div className="lg:w-[35%] p-8 lg:p-10 space-y-3 flex flex-col justify-center">
                                                         <div className="flex items-center gap-2 mb-1">
                                                             <TrendingUp className="w-3 h-3 text-blue-500" />
-                                                            <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest leading-none">Ejecutor Responsable del Proceso</span>
+                                                            <span className="text-[9px] font-black text-slate-500 dark:text-gray-500 uppercase tracking-widest leading-none">Ejecutor Responsable del Proceso</span>
                                                         </div>
                                                         <div className="relative">
                                                             <select
-                                                                className={`w-full bg-black/60 border ${qState.op_id ? 'border-blue-500/40 text-blue-400' : 'border-white/10 text-gray-500'} rounded-[1.25rem] py-4 px-6 text-xs font-black outline-none focus:ring-4 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer uppercase`}
+                                                                className={`w-full bg-black/5 dark:bg-black/60 border ${qState.op_id ? 'border-blue-500/40 text-blue-500 dark:text-blue-400' : 'border-black/10 dark:border-white/10 text-slate-600 dark:text-gray-500'} rounded-[1.25rem] py-4 px-6 text-xs font-black outline-none focus:ring-4 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer uppercase`}
                                                                 value={qState.op_id}
                                                                 onChange={(e) => setAuditState({
                                                                     ...auditState,
@@ -365,12 +365,12 @@ export default function AuditPage() {
                                                             >
                                                                 <option value="">-- SELECCIONAR OPERARIO --</option>
                                                                 {filteredPersonnel.map((p: any) => (
-                                                                    <option key={p.ID || p.Cedula} value={p.ID || p.Cedula} className="bg-[#0f0f0f] text-white py-2">
+                                                                    <option key={p.ID || p.Cedula} value={p.ID || p.Cedula} className="bg-white dark:bg-[#0f0f0f] text-slate-900 dark:text-white py-2">
                                                                         {p.NombreCompleto || p.Nombre} {p.Area ? `| ${p.Area}` : ''}
                                                                     </option>
                                                                 ))}
                                                             </select>
-                                                            <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-600 pointer-events-none" />
+                                                            <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 dark:text-gray-600 pointer-events-none" />
                                                         </div>
                                                     </div>
                                                 </div>
@@ -381,7 +381,7 @@ export default function AuditPage() {
                                                         <div className="relative group/txt">
                                                             <MessageSquare className="absolute left-6 top-6 w-5 h-5 text-blue-500/30 group-focus-within/txt:text-blue-500 transition-all" />
                                                             <textarea
-                                                                className="w-full bg-blue-600/5 border border-white/5 rounded-[2.5rem] p-7 pl-14 text-sm font-medium min-h-[110px] outline-none focus:ring-4 focus:ring-blue-500/10 transition-all placeholder:text-gray-800"
+                                                                className="w-full bg-blue-600/5 dark:bg-blue-600/10 border border-blue-500/10 dark:border-white/5 rounded-[2.5rem] p-7 pl-14 text-sm font-medium min-h-[110px] outline-none focus:ring-4 focus:ring-blue-500/20 transition-all text-slate-900 dark:text-white placeholder:text-blue-500/50 dark:placeholder:text-gray-600"
                                                                 placeholder={q.commentPlaceholder}
                                                                 value={comments[q.hasComment] || ''}
                                                                 onChange={(e) => setComments({ ...comments, [q.hasComment]: e.target.value })}
@@ -398,7 +398,7 @@ export default function AuditPage() {
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="pt-16 pb-24 border-t border-white/5 space-y-8">
+                    <div className="pt-16 pb-24 border-t border-black/5 dark:border-white/5 space-y-8">
                         <button
                             onClick={handleSave}
                             disabled={saving}
@@ -425,17 +425,6 @@ export default function AuditPage() {
 
                 </div>
             </main>
-
-            <style jsx global>{`
-                .glass-card {
-                    background: rgba(255, 255, 255, 0.02);
-                    backdrop-filter: blur(25px);
-                    -webkit-backdrop-filter: blur(25px);
-                }
-                select {
-                    -webkit-appearance: none;
-                }
-            `}</style>
         </div>
     )
 }

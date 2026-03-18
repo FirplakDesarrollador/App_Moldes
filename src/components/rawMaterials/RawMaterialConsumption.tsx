@@ -65,9 +65,9 @@ export default function RawMaterialConsumption() {
             }
             setSearchingMolds(true)
             const { data } = await supabase
-                .from('base_datos_moldes')
-                .select('ID, Nombre, "CODIGO MOLDE"')
-                .or(`Nombre.ilike.%${moldSearchQuery}%, "CODIGO MOLDE".ilike.%${moldSearchQuery}%`)
+                .from('moldes')
+                .select('id, nombre_articulo, serial')
+                .or(`nombre_articulo.ilike.%${moldSearchQuery}%, serial.ilike.%${moldSearchQuery}%`)
                 .limit(5)
             setMoldResults(data || [])
             setSearchingMolds(false)
@@ -137,20 +137,20 @@ export default function RawMaterialConsumption() {
                     <Factory className="w-6 h-6 text-green-400" />
                 </div>
                 <div>
-                    <h1 className="text-3xl font-black tracking-tight text-white mb-1">
+                    <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white mb-1">
                         Consumo de <span className="text-green-500">Materia Prima</span>
                     </h1>
                     <p className="text-gray-500 text-sm italic">Registro de movimientos y salidas de almacén.</p>
                 </div>
             </div>
 
-            <form onSubmit={handleSave} className="p-8 glass-card rounded-[2.5rem] border border-white/5 space-y-8">
+            <form onSubmit={handleSave} className="p-8 glass-card rounded-[2.5rem] border border-black/5 dark:border-white/5 space-y-8">
                 {/* FILA 1: Materia Prima | Código | Unidades */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Materia Prima</label>
                         <select
-                            className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white focus:ring-2 focus:ring-green-500/50 outline-none transition-all appearance-none"
+                            className="w-full bg-black/5 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl py-3 px-4 text-slate-900 dark:text-white focus:ring-2 focus:ring-green-500/50 outline-none transition-all appearance-none"
                             value={formData.materiaPrima}
                             onChange={(e) => handleMateriaPrimaChange(e.target.value)}
                             required
@@ -164,14 +164,14 @@ export default function RawMaterialConsumption() {
 
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Código SAP</label>
-                        <div className="w-full bg-white/5 border border-white/5 rounded-xl py-3 px-4 text-gray-400 font-mono text-sm min-h-[50px] flex items-center">
+                        <div className="w-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 rounded-xl py-3 px-4 text-slate-500 dark:text-gray-400 font-mono text-sm min-h-[50px] flex items-center">
                             {formData.sapNumber || 'Automático'}
                         </div>
                     </div>
 
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Unidades</label>
-                        <div className="w-full bg-white/5 border border-white/5 rounded-xl py-3 px-4 text-gray-400 text-sm min-h-[50px] flex items-center">
+                        <div className="w-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 rounded-xl py-3 px-4 text-slate-500 dark:text-gray-400 text-sm min-h-[50px] flex items-center">
                             {formData.unidad || 'Unidad de medida'}
                         </div>
                     </div>
@@ -182,7 +182,7 @@ export default function RawMaterialConsumption() {
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Tipo de Movimiento</label>
                         <select
-                            className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white focus:ring-2 focus:ring-green-500/50 outline-none transition-all appearance-none"
+                            className="w-full bg-black/5 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl py-3 px-4 text-slate-900 dark:text-white focus:ring-2 focus:ring-green-500/50 outline-none transition-all appearance-none"
                             value={formData.tipo}
                             onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
                             required
@@ -198,7 +198,7 @@ export default function RawMaterialConsumption() {
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Concepto</label>
                         <select
-                            className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white focus:ring-2 focus:ring-green-500/50 outline-none transition-all appearance-none"
+                            className="w-full bg-black/5 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl py-3 px-4 text-slate-900 dark:text-white focus:ring-2 focus:ring-green-500/50 outline-none transition-all appearance-none"
                             value={formData.concepto}
                             onChange={(e) => {
                                 const newConcept = e.target.value
@@ -231,7 +231,7 @@ export default function RawMaterialConsumption() {
                             <input
                                 type="text"
                                 placeholder="Escribe nombre o código del molde..."
-                                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:ring-2 focus:ring-blue-500/50 outline-none transition-all"
+                                className="w-full bg-black/5 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl py-3 pl-12 pr-4 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/50 outline-none transition-all"
                                 value={formData.moldeNombre || moldSearchQuery}
                                 onChange={(e) => {
                                     setMoldSearchQuery(e.target.value)
@@ -242,19 +242,19 @@ export default function RawMaterialConsumption() {
                             {searchingMolds && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500 animate-spin" />}
                         </div>
                         {moldResults.length > 0 && (
-                            <div className="absolute z-50 w-full mt-2 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+                            <div className="absolute z-50 w-full mt-2 bg-white dark:bg-[#1a1a1a] border border-black/10 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden">
                                 {moldResults.map((m, i) => (
                                     <div
                                         key={i}
                                         onClick={() => {
-                                            setFormData({ ...formData, moldeId: m.ID, moldeNombre: `${m.Nombre} [${m['CODIGO MOLDE']}]` })
+                                            setFormData({ ...formData, moldeId: m.id, moldeNombre: `${m.nombre_articulo} [${m.serial}]` })
                                             setMoldResults([])
                                             setMoldSearchQuery('')
                                         }}
-                                        className="p-4 hover:bg-blue-600/20 cursor-pointer border-b border-white/5 last:border-0"
+                                        className="p-4 hover:bg-black/5 dark:hover:bg-blue-600/20 cursor-pointer border-b border-black/5 dark:border-white/5 last:border-0"
                                     >
-                                        <p className="text-sm font-bold text-white">{m.Nombre}</p>
-                                        <p className="text-xs text-gray-500">{m['CODIGO MOLDE']}</p>
+                                        <p className="text-sm font-bold text-slate-900 dark:text-white">{m.nombre_articulo}</p>
+                                        <p className="text-xs text-slate-500 dark:text-gray-500">{m.serial}</p>
                                     </div>
                                 ))}
                             </div>
@@ -272,7 +272,7 @@ export default function RawMaterialConsumption() {
                 <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Observaciones</label>
                     <textarea
-                        className="w-full bg-black/40 border border-white/10 rounded-2xl py-4 px-4 text-white focus:ring-2 focus:ring-green-500/50 outline-none transition-all min-h-[120px] resize-none"
+                        className="w-full bg-black/5 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-2xl py-4 px-4 text-slate-900 dark:text-white focus:ring-2 focus:ring-green-500/50 outline-none transition-all min-h-[120px] resize-none"
                         placeholder="Detalles adicionales del movimiento..."
                         value={formData.observaciones}
                         onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}

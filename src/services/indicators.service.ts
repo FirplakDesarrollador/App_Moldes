@@ -15,25 +15,25 @@ export const indicatorsService = {
         const supabase = createClient()
 
         let query = supabase
-            .from('Base_datos_moldes_dinámica')
+            .from('moldes')
             .select('*')
-            .gte('FECHA ESPERADA', dateRange.start)
-            .lte('FECHA ESPERADA', dateRange.end)
+            .gte('Fecha_esperada', dateRange.start)
+            .lte('Fecha_esperada', dateRange.end)
 
         const { data, error } = await query
         if (error) throw error
 
         const molds = data as MoldActive[]
 
-        // Entregados a tiempo: FECHA ENTREGA <= FECHA ESPERADA
+        // Entregados a tiempo: Fecha_de_entrega <= Fecha_esperada
         const entregadasATiempo = molds.filter(m => {
-            if (!m["FECHA ENTREGA"]) return false
-            const entrega = new Date(m["FECHA ENTREGA"])
-            const esperada = new Date(m["FECHA ESPERADA"])
+            if (!m.Fecha_de_entrega) return false
+            const entrega = new Date(m.Fecha_de_entrega)
+            const esperada = new Date(m.Fecha_esperada)
             return entrega <= esperada
         })
 
-        const pendientes = molds.filter(m => !m["FECHA ENTREGA"] || m["ESTADO"] !== 'ENTREGADO')
+        const pendientes = molds.filter(m => !m.Fecha_de_entrega || m.estado !== 'ENTREGADO')
 
         const totalComprometidas = molds.length
         const totalEntregadasATiempo = entregadasATiempo.length
@@ -49,8 +49,8 @@ export const indicatorsService = {
         }
 
         molds.forEach(m => {
-            const tipo = (m["Tipo de reparacion"] || '').toUpperCase().trim()
-            const defecto = (m["DEFECTOS A REPARAR"] || '').toUpperCase().trim()
+            const tipo = (m.Tipo_de_reparacion || '').toUpperCase().trim()
+            const defecto = (m.Observaciones_reparacion || '').toUpperCase().trim()
 
             if (defecto === 'MOLDE NUEVO') {
                 categorias['MOLDE_NUEVO']++

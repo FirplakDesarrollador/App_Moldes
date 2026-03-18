@@ -1,0 +1,31 @@
+{
+  "base_datos": [
+    "Nombre",
+    "CODIGO MOLDE",
+    "DEFECTOS A REPARAR",
+    "FECHA ENTRADA",
+    "FECHA ESPERADA",
+    "FECHA ENTREGA",
+    "ESTADO",
+    "OBSERVACIONES",
+    "Usuario",
+    "Recibido",
+    "Prioridad",
+    "H altura de pestaña",
+    "Created",
+    "Responsable",
+    "Tipo de reparacion",
+    "Tipo",
+    "ID",
+    "espesor_pestana",
+    "espesor_bowl",
+    "espesor_fondo",
+    "espesor_parte_plana",
+    "espesor_angulos",
+    "espesor_radios",
+    "Modified",
+    "Created By",
+    "Modified By"
+  ],
+  "migracion": []
+}
