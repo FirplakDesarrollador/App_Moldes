@@ -1,22 +1,53 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Package, ClipboardList, TrendingUp, Activity, Search, Filter, Calendar, Info, Loader2, Clock } from 'lucide-react'
-import { createClient } from '@/lib/supabase'
-import { moldsService, MoldActive } from '@/services/molds.service'
+import { Package, ClipboardList, Activity, Search, Clock, Loader2, Filter, Calendar, User, Trash2 } from 'lucide-react'
+import { moldsService } from '@/services/molds.service'
 import Navbar from '@/components/layout/Navbar'
 
-export default function HistoryPage() {
+const BATCH_SIZE = 20
+
+export default function RegistrosMoldesPage() {
     const router = useRouter()
     const [user, setUser] = useState<any>(null)
-    const [loading, setLoading] = useState(true)
-    const [results, setResults] = useState<MoldActive[]>([])
-
-    // Filters
+    const [loading, setLoading] = useState(false)
+    const [loadingMore, setLoadingMore] = useState(false)
+    const [records, setRecords] = useState<any[]>([])
+    
+    // Filters State
     const [searchTerm, setSearchTerm] = useState('')
-    const [isSearching, setIsSearching] = useState(false)
+    const [filterDefecto, setFilterDefecto] = useState('')
+    const [filterResponsable, setFilterResponsable] = useState('')
+    const [filterFechaDesde, setFilterFechaDesde] = useState('')
+    const [filterFechaHasta, setFilterFechaHasta] = useState('')
+    
+    // Catalogs State
+    const [defectsCatalog, setDefectsCatalog] = useState<any[]>([])
+    const [personnelCatalog, setPersonnelCatalog] = useState<any[]>([])
+    
+    const [offset, setOffset] = useState(0)
+    const [hasMore, setHasMore] = useState(true)
+    
+    // Timer for debounced search
+    const searchTimeout = useRef<NodeJS.Timeout | null>(null)
 
+    // Reference for intersection observer
+    const observer = useRef<IntersectionObserver | null>(null)
+    const lastElementRef = useCallback((node: HTMLTableRowElement) => {
+        if (loading || loadingMore) return
+        if (observer.current) observer.current.disconnect()
+        
+        observer.current = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting && hasMore) {
+                setOffset(prev => prev + BATCH_SIZE)
+            }
+        })
+        
+        if (node) observer.current.observe(node)
+    }, [loading, loadingMore, hasMore])
+
+    // Load User and Catalogs
     useEffect(() => {
         const storedUser = localStorage.getItem('moldapp_user')
         if (!storedUser) {
@@ -24,128 +55,287 @@ export default function HistoryPage() {
             return
         }
         setUser(JSON.parse(storedUser))
-        setLoading(false)
+
+        const loadCatalogs = async () => {
+            try {
+                // Fetch both catalogs in parallel
+                const [defects, personnel] = await Promise.all([
+                    moldsService.getDefectsCatalog(),
+                    moldsService.getPersonnel()
+                ])
+                setDefectsCatalog(defects || [])
+                setPersonnelCatalog(personnel || [])
+            } catch (error) {
+                console.error('Error loading catalogs:', error)
+            }
+        }
+        loadCatalogs()
     }, [router])
 
-    const handleSearch = async () => {
-        if (!searchTerm.trim()) return
-
-        setIsSearching(true)
+    const fetchInitial = async (searchVal: string, filters: any) => {
+        setLoading(true)
+        setOffset(0)
         try {
-            // Buscamos historial completo del molde seleccionado
-            const data = await moldsService.getHistoryForMold(searchTerm.trim())
-            setResults(data)
+            const data = await moldsService.getAllRegistros(BATCH_SIZE, 0, searchVal, filters)
+            setRecords(data || [])
+            setHasMore(data?.length === BATCH_SIZE)
         } catch (error) {
-            console.error('Error fetching history:', error)
+            console.error('Error fetching data:', error)
+            setRecords([])
         } finally {
-            setIsSearching(false)
+            setLoading(false)
         }
     }
 
+    const fetchMore = async () => {
+        if (loadingMore || !hasMore) return
+        setLoadingMore(true)
+        try {
+            const filters = {
+                defecto: filterDefecto,
+                responsable: filterResponsable,
+                fecha_desde: filterFechaDesde,
+                fecha_hasta: filterFechaHasta
+            }
+            const data = await moldsService.getAllRegistros(BATCH_SIZE, offset, searchTerm, filters)
+            if (data.length < BATCH_SIZE) setHasMore(false)
+            setRecords(prev => [...prev, ...data])
+        } catch (error) {
+            console.error('Error loading more:', error)
+        } finally {
+            setLoadingMore(false)
+        }
+    }
+
+    // Effect for offset change (infinite scroll)
+    useEffect(() => {
+        if (offset > 0) {
+            fetchMore()
+        }
+    }, [offset])
+
+    // Effect for active filters (re-fetches when dropdowns or dates change)
+    useEffect(() => {
+        const filters = {
+            defecto: filterDefecto,
+            responsable: filterResponsable,
+            fecha_desde: filterFechaDesde,
+            fecha_hasta: filterFechaHasta
+        }
+        fetchInitial(searchTerm, filters)
+    }, [filterDefecto, filterResponsable, filterFechaDesde, filterFechaHasta])
+
+    const handleSearchChange = (val: string) => {
+        setSearchTerm(val)
+        if (searchTimeout.current) clearTimeout(searchTimeout.current)
+        searchTimeout.current = setTimeout(() => {
+            const filters = {
+                defecto: filterDefecto,
+                responsable: filterResponsable,
+                fecha_desde: filterFechaDesde,
+                fecha_hasta: filterFechaHasta
+            }
+            fetchInitial(val, filters)
+        }, 500)
+    }
+
+    const clearFilters = () => {
+        setSearchTerm('')
+        setFilterDefecto('')
+        setFilterResponsable('')
+        setFilterFechaDesde('')
+        setFilterFechaHasta('')
+    }
+
     return (
-        <div className="min-h-screen bg-[#050505] text-white">
+        <div className="min-h-screen bg-[#f8fafc] dark:bg-[#020617] text-slate-900 dark:text-slate-100">
             <Navbar
                 user={user}
                 showBackButton
                 backPath="/dashboard"
-                title="Histórico"
-                subtitle="Trazabilidad Completa"
+                title="Registros de moldes"
+                subtitle="Consolidado Histórico de Producción"
             />
 
-            {/* Main Content */}
             <main className="pt-32 pb-20 px-6 max-w-7xl mx-auto">
-                <div className="space-y-8 animate-in fade-in duration-500">
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
 
-                    {/* Search Bar for History */}
-                    <div className="p-10 glass-card rounded-[3rem] border border-white/5 space-y-8 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/5 rounded-full blur-[100px] -mr-48 -mt-48 pointer-events-none group-hover:bg-blue-600/10 transition-colors" />
+                    {/* Dashboard Header / Filter Section */}
+                    <div className="bg-white dark:bg-slate-900/50 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl dark:shadow-blue-900/10 p-8 lg:p-12 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 blur-[80px] -mr-32 -mt-32 rounded-full" />
+                        
+                        <div className="relative z-10 space-y-8">
+                            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                                <div className="space-y-2">
+                                    <h2 className="text-4xl font-black tracking-tight text-slate-900 dark:text-white">Panel de <span className="text-blue-500">Filtrado</span></h2>
+                                    <p className="text-slate-500 dark:text-slate-400 font-medium">Gestiona y analiza el histórico de reparaciones con precisión.</p>
+                                </div>
+                                <button 
+                                    onClick={clearFilters}
+                                    className="flex items-center gap-2 px-6 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-red-500 hover:text-white text-slate-600 dark:text-slate-400 rounded-2xl transition-all font-bold text-xs uppercase tracking-widest border border-slate-200 dark:border-slate-700"
+                                >
+                                    <Trash2 className="w-4 h-4" /> Limpiar Todo
+                                </button>
+                            </div>
 
-                        <div className="max-w-2xl">
-                            <h2 className="text-3xl font-black mb-4 tracking-tighter">Buscador de <span className="text-blue-500">Trazabilidad</span></h2>
-                            <p className="text-gray-500 text-sm mb-8 font-medium">Ingresa el código exacto del molde para desplegar todos los eventos históricos registrados en la base de datos dinámica.</p>
-
-                            <div className="flex flex-col sm:flex-row gap-4">
-                                <div className="flex-1 relative group/input">
-                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within/input:text-blue-500 transition-colors" />
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                                {/* BUSCADOR GLOBAL */}
+                                <div className="md:col-span-2 xl:col-span-2 relative group">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                                     <input
                                         type="text"
-                                        placeholder="Código del Molde (Ej: 0062-47)..."
-                                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white focus:ring-2 focus:ring-blue-500/50 outline-none transition-all font-mono"
+                                        placeholder="Código, Nombre, Usuario..."
+                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 pl-12 pr-4 text-sm font-medium focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none"
                                         value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                                        onChange={(e) => handleSearchChange(e.target.value)}
                                     />
+                                    <label className="absolute -top-2 left-6 px-2 bg-white dark:bg-[#0f172a] text-[9px] font-black text-blue-500 uppercase tracking-widest">Buscador Global</label>
                                 </div>
-                                <button
-                                    onClick={handleSearch}
-                                    disabled={isSearching}
-                                    className="bg-blue-600 hover:bg-blue-500 text-white font-black px-8 py-4 rounded-2xl transition-all shadow-xl shadow-blue-600/20 active:scale-[0.98] disabled:opacity-50 uppercase text-[10px] tracking-[0.2em]"
-                                >
-                                    {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : "Consultar Trazabilidad"}
-                                </button>
+
+                                {/* FILTRO DEFECTOS */}
+                                <div className="xl:col-span-1 relative group">
+                                    <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500" />
+                                    <select
+                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 pl-12 pr-4 text-xs font-bold appearance-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none uppercase"
+                                        value={filterDefecto}
+                                        onChange={(e) => setFilterDefecto(e.target.value)}
+                                    >
+                                        <option value="">TODOS LOS DEFECTOS</option>
+                                        {defectsCatalog.map((d, i) => (
+                                            <option key={i} value={d.Título}>{d.Título}</option>
+                                        ))}
+                                    </select>
+                                    <label className="absolute -top-2 left-6 px-2 bg-white dark:bg-[#0f172a] text-[9px] font-black text-blue-500 uppercase tracking-widest">Defectos</label>
+                                </div>
+
+                                {/* FILTRO RESPONSABLE */}
+                                <div className="xl:col-span-1 relative group">
+                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500" />
+                                    <select
+                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 pl-12 pr-4 text-xs font-bold appearance-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none uppercase"
+                                        value={filterResponsable}
+                                        onChange={(e) => setFilterResponsable(e.target.value)}
+                                    >
+                                        <option value="">TODOS LOS RESPONSABLES</option>
+                                        {personnelCatalog.map((p, i) => (
+                                            <option key={i} value={p.NombreCompleto}>{p.NombreCompleto}</option>
+                                        ))}
+                                    </select>
+                                    <label className="absolute -top-2 left-6 px-2 bg-white dark:bg-[#0f172a] text-[9px] font-black text-blue-500 uppercase tracking-widest">Personal</label>
+                                </div>
+
+                                {/* FECHA DESDE */}
+                                <div className="xl:col-span-1 relative group">
+                                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500" />
+                                    <input
+                                        type="date"
+                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 pl-12 pr-4 text-xs font-black focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none"
+                                        value={filterFechaDesde}
+                                        onChange={(e) => setFilterFechaDesde(e.target.value)}
+                                    />
+                                    <label className="absolute -top-2 left-6 px-2 bg-white dark:bg-[#0f172a] text-[9px] font-black text-blue-500 uppercase tracking-widest">Fecha Desde</label>
+                                </div>
+
+                                {/* FECHA HASTA */}
+                                <div className="xl:col-span-1 relative group">
+                                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500" />
+                                    <input
+                                        type="date"
+                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 pl-12 pr-4 text-xs font-black focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none"
+                                        value={filterFechaHasta}
+                                        onChange={(e) => setFilterFechaHasta(e.target.value)}
+                                    />
+                                    <label className="absolute -top-2 left-6 px-2 bg-white dark:bg-[#0f172a] text-[9px] font-black text-blue-500 uppercase tracking-widest">Fecha Hasta</label>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Results Table */}
-                    <div className="p-8 glass-card rounded-[2.5rem] border border-white/5 bg-black/40 backdrop-blur-3xl">
-                        <div className="flex items-center justify-between mb-8 px-4">
-                            <h3 className="text-xl font-black flex items-center gap-3">
-                                <Clock className="w-6 h-6 text-blue-500" /> Eventos del Molde
+                    {/* TABLE SECTION */}
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-sm overflow-hidden min-h-[500px]">
+                        <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
+                            <h3 className="font-black text-sm uppercase tracking-widest flex items-center gap-3">
+                                <Clock className="w-5 h-5 text-blue-500" /> Historial de Movimientos
                             </h3>
-                            {results.length > 0 && (
-                                <span className="px-4 py-1.5 bg-blue-500/10 text-blue-400 rounded-full text-[10px] font-black border border-blue-500/20 uppercase tracking-widest">
-                                    {results.length} Registros Encontrados
+                            <div className="flex items-center gap-3">
+                                {loadingMore && <Loader2 className="w-4 h-4 animate-spin text-blue-500" />}
+                                <span className="px-5 py-2 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-full text-[10px] font-black border border-blue-100 dark:border-blue-500/20 uppercase tracking-widest">
+                                    {records.length} Resultados
                                 </span>
-                            )}
+                            </div>
                         </div>
 
                         <div className="overflow-x-auto custom-scrollbar">
-                            <table className="w-full text-left border-collapse min-w-[1000px]">
+                            <table className="w-full text-left border-collapse min-w-[1100px]">
                                 <thead>
-                                    <tr className="border-b border-white/10">
-                                        <th className="py-5 px-6 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Fecha Evento</th>
-                                        <th className="py-5 px-6 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Estado</th>
-                                        <th className="py-5 px-6 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Tipo/Categoría</th>
-                                        <th className="py-5 px-6 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Defectos / Obs</th>
-                                        <th className="py-5 px-6 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Usuario</th>
+                                    <tr className="bg-slate-50/50 dark:bg-slate-950/20 border-b border-slate-100 dark:border-slate-800">
+                                        <th className="py-6 px-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">Registro / Fecha</th>
+                                        <th className="py-6 px-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">Información Molde</th>
+                                        <th className="py-6 px-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado Actual</th>
+                                        <th className="py-6 px-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">Defectos & Notas</th>
+                                        <th className="py-6 px-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">Personal Asignado</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-white/5">
-                                    {results.map((m, i) => (
-                                        <tr key={i} className="hover:bg-white/[0.02] transition-colors group">
-                                            <td className="py-5 px-6 border-l-2 border-transparent group-hover:border-blue-500 transition-all">
-                                                <div className="flex flex-col">
-                                                    <span className="text-xs font-black text-white">{new Date(m.Created).toLocaleDateString()}</span>
-                                                    <span className="text-[10px] text-gray-500 font-mono tracking-tighter">{new Date(m.Created).toLocaleTimeString()}</span>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                    {records.map((m, i) => (
+                                        <tr 
+                                            key={`${m.ID}-${i}`} 
+                                            ref={i === records.length - 1 ? lastElementRef : null}
+                                            className="hover:bg-slate-50/80 dark:hover:bg-slate-800/30 transition-all group"
+                                        >
+                                            <td className="py-6 px-8">
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-xs font-black text-slate-900 dark:text-white">
+                                                        {m['FECHA ENTRADA'] && m['FECHA ENTRADA'] !== 'null' ? m['FECHA ENTRADA'] : 'S/F'}
+                                                    </span>
+                                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Entrada</span>
                                                 </div>
                                             </td>
-                                            <td className="py-5 px-6">
-                                                <span className={`px-3 py-1 rounded-lg text-[10px] font-black border uppercase ${m.ESTADO?.includes('ESPERA') ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
-                                                        m.ESTADO?.includes('REPARACION') ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                                                            'bg-green-500/10 text-green-500 border-green-500/20'
-                                                    }`}>
-                                                    {m.ESTADO || 'S/E'}
+                                            <td className="py-6 px-8">
+                                                <div className="space-y-1">
+                                                    <div className="text-xs font-black text-slate-700 dark:text-slate-200 group-hover:text-blue-500 transition-colors uppercase">
+                                                        {m['CODIGO MOLDE'] || 'S/C'}
+                                                    </div>
+                                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter line-clamp-1">
+                                                        {m['Nombre'] || 'Sin Título'}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="py-6 px-8">
+                                                <span className={`px-3 py-1.5 rounded-xl text-[9px] font-black border uppercase tracking-widest ${
+                                                    m['ESTADO']?.toUpperCase().includes('ESPERA') ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' :
+                                                    m['ESTADO']?.toUpperCase().includes('PROCESO') || m['ESTADO']?.toUpperCase().includes('REPARACION') ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' :
+                                                    m['ESTADO']?.toUpperCase().includes('ENTREGADO') || m['ESTADO']?.toUpperCase().includes('OK') ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' :
+                                                    'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
+                                                }`}>
+                                                    {m['ESTADO'] || 'Sin Estado'}
                                                 </span>
                                             </td>
-                                            <td className="py-5 px-6">
-                                                <div className="flex flex-col gap-1">
-                                                    <span className="text-xs font-bold text-gray-300">{m["Tipo de reparacion"]}</span>
-                                                    <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest">{m.Tipo}</span>
+                                            <td className="py-6 px-8 max-w-[350px]">
+                                                <div className="space-y-1.5">
+                                                    <p className="text-xs font-bold text-red-500 dark:text-red-400/90 leading-relaxed">
+                                                        {m['DEFECTOS A REPARAR'] || '--'}
+                                                    </p>
+                                                    {m['OBSERVACIONES'] && (
+                                                        <p className="text-[10px] text-slate-500 dark:text-slate-500 italic line-clamp-2">
+                                                            {m['OBSERVACIONES']}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </td>
-                                            <td className="py-5 px-6 max-w-[300px]">
-                                                <div className="space-y-1">
-                                                    <p className="text-xs font-bold text-red-400/80">{m["DEFECTOS A REPARAR"]}</p>
-                                                    <p className="text-[10px] text-gray-500 italic line-clamp-2">{m.OBSERVACIONES}</p>
-                                                </div>
-                                            </td>
-                                            <td className="py-5 px-6">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
-                                                        <span className="text-[8px] font-black text-blue-500">{(m.Usuario || 'U').charAt(0)}</span>
+                                            <td className="py-6 px-8">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-2xl bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center border border-blue-500/20 shrink-0">
+                                                        <User className="w-3.5 h-3.5 text-blue-500" />
                                                     </div>
-                                                    <span className="text-[10px] font-bold text-gray-500">{m.Usuario}</span>
+                                                    <div className="flex flex-col min-w-0">
+                                                        <span className="text-[10px] font-black text-slate-800 dark:text-white truncate uppercase tracking-tight">
+                                                            {m['Responsable'] || 'No Asignado'}
+                                                        </span>
+                                                        <span className="text-[8px] font-bold text-slate-500 uppercase">
+                                                            ID: {m['ID'] || '---'}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </td>
                                         </tr>
@@ -153,12 +343,32 @@ export default function HistoryPage() {
                                 </tbody>
                             </table>
 
-                            {results.length === 0 && !isSearching && (
-                                <div className="py-32 text-center space-y-4">
-                                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 border border-white/5">
-                                        <Info className="w-8 h-8 text-gray-700" />
+                            {/* LOADING STATES */}
+                            {loading && (
+                                <div className="p-24 flex flex-col items-center justify-center">
+                                    <div className="relative">
+                                        <div className="w-16 h-16 border-4 border-blue-500/10 border-t-blue-500 rounded-full animate-spin" />
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <Loader2 className="w-6 h-6 text-blue-500 animate-pulse" />
+                                        </div>
                                     </div>
-                                    <p className="text-gray-500 italic font-medium">Ingresa un código de molde para iniciar la búsqueda de eventos históricos.</p>
+                                    <p className="text-sm font-black text-slate-400 mt-8 animate-pulse tracking-widest uppercase">Consultando Datos Unificados...</p>
+                                </div>
+                            )}
+
+                            {!loading && records.length === 0 && (
+                                <div className="p-24 flex flex-col items-center justify-center text-center">
+                                    <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-3xl flex items-center justify-center mb-6">
+                                        <Search className="w-10 h-10 text-slate-300 dark:text-slate-600" />
+                                    </div>
+                                    <h4 className="text-lg font-black text-slate-900 dark:text-white mb-2">Sin Resultados</h4>
+                                    <p className="text-sm text-slate-500 max-w-xs mx-auto">No encontramos registros que coincidan con los filtros aplicados actualmente.</p>
+                                </div>
+                            )}
+
+                            {loadingMore && (
+                                <div className="p-10 text-center bg-slate-50/50 dark:bg-slate-950/50 animate-pulse">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-blue-500">Recuperando más información...</p>
                                 </div>
                             )}
                         </div>
@@ -166,16 +376,16 @@ export default function HistoryPage() {
                 </div>
             </main>
 
-            {/* Bottom Floating Navigation (Optional but kept for UX) */}
-            <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2 bg-black/60 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl z-50">
-                <button onClick={() => router.push('/dashboard/molds')} className="flex items-center gap-2 px-6 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-2xl transition-all font-bold text-xs uppercase tracking-widest">
-                    <Package className="w-4 h-4" /> Edición
+            {/* FLOATING ACTION NAV */}
+            <div className="fixed bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2.5 bg-white/80 dark:bg-slate-900/80 backdrop-blur-3xl border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-2xl z-50">
+                <button onClick={() => router.push('/dashboard/molds')} className="flex items-center gap-3 px-8 py-4 text-slate-500 dark:text-slate-400 hover:text-blue-500 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800 rounded-3xl transition-all font-black text-[10px] uppercase tracking-widest">
+                    <Package className="w-4 h-4" /> Molds
                 </button>
-                <div className="px-6 py-3 bg-white/10 text-white rounded-2xl transition-all font-black text-xs flex items-center gap-2 shadow-lg shadow-white/5 uppercase tracking-widest">
-                    <ClipboardList className="w-4 h-4 text-blue-400" /> Trazabilidad
+                <div className="px-8 py-4 bg-blue-500 text-white rounded-3xl transition-all font-black text-[10px] flex items-center gap-3 shadow-xl shadow-blue-500/30 uppercase tracking-widest">
+                    <ClipboardList className="w-4 h-4" /> History
                 </div>
-                <button onClick={() => router.push('/dashboard/audit')} className="flex items-center gap-2 px-6 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-2xl transition-all font-bold text-xs uppercase tracking-widest">
-                    <Activity className="w-4 h-4" /> Auditoría
+                <button onClick={() => router.push('/dashboard/audit')} className="flex items-center gap-3 px-8 py-4 text-slate-500 dark:text-slate-400 hover:text-blue-500 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800 rounded-3xl transition-all font-black text-[10px] uppercase tracking-widest">
+                    <Activity className="w-4 h-4" /> Audit
                 </button>
             </div>
         </div>

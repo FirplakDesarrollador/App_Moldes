@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import MoldSearch from '@/components/molds/MoldSearch'
-import MoldDetails from '@/components/molds/MoldDetails'
+import AddMoldModal from '@/components/molds/AddMoldModal'
 import Navbar from '@/components/layout/Navbar'
 import SAPSessionBadge from '@/components/auth/SAPSessionBadge'
 import { Settings, Briefcase, Factory, CheckCircle2, TrendingUp } from 'lucide-react'
@@ -31,23 +31,23 @@ export default function DashboardPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+            <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
             </div>
         )
     }
 
     return (
-        <main className="min-h-screen bg-[#050505] text-white selection:bg-blue-500/30">
+        <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)] selection:bg-blue-500/30">
             <Navbar user={user} />
 
             <div className="max-w-7xl mx-auto px-6 py-12">
                 <div className="max-w-4xl mx-auto text-center mb-12 space-y-4">
-                    <h1 className="text-5xl font-black tracking-tight text-white leading-[1.1]">
+                    <h1 className="text-5xl font-black tracking-tight leading-[1.1]">
                         Panel de <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 font-extrabold">Control</span>
                     </h1>
                     <p className="text-gray-500 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
-                        Bienvenido, <span className="text-white font-medium">{user?.Nombre || user?.NombreCompleto}</span>. Tienes acceso a la base de datos de moldes de la planta <span className="text-blue-400 font-bold uppercase">{user?.Planta || 'Principal'}</span>.
+                        Bienvenido, <span className="text-slate-900 dark:text-white font-medium">{user?.Nombre || user?.NombreCompleto}</span>. Tienes acceso a la base de datos de moldes de la planta <span className="text-blue-400 font-bold uppercase">{user?.Planta || 'Principal'}</span>.
                     </p>
                 </div>
 
@@ -55,52 +55,52 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-16">
                     <button
                         onClick={() => window.location.href = '/dashboard/molds'}
-                        className="p-6 glass-card rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-blue-500/5"
+                        className="p-6 glass-card rounded-2xl border border-black/5 dark:border-white/5 hover:border-blue-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-blue-500/5 group"
                     >
                         <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-500/20 group-hover:scale-110 transition-transform">
-                            <Settings className="w-6 h-6 text-blue-400" />
+                            <Settings className="w-6 h-6 text-blue-500 dark:text-blue-400" />
                         </div>
-                        <span className="text-sm font-bold tracking-wide">Moldes</span>
+                        <span className="text-sm font-bold tracking-wide text-slate-800 dark:text-white">Moldes</span>
                     </button>
 
                     <button
                         onClick={() => window.location.href = '/dashboard/history'}
-                        className="p-6 glass-card rounded-2xl border border-white/5 hover:border-purple-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-purple-500/5"
+                        className="p-6 glass-card rounded-2xl border border-black/5 dark:border-white/5 hover:border-purple-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-purple-500/5 group"
                     >
                         <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center border border-purple-500/20 group-hover:scale-110 transition-transform">
-                            <Briefcase className="w-6 h-6 text-purple-400" />
+                            <Briefcase className="w-6 h-6 text-purple-500 dark:text-purple-400" />
                         </div>
-                        <span className="text-sm font-bold tracking-wide">Histórico Moldes</span>
+                        <span className="text-sm font-bold tracking-wide text-slate-800 dark:text-white">Registros de moldes</span>
                     </button>
 
                     <button
                         onClick={() => window.location.href = '/dashboard/raw-materials'}
-                        className="p-6 glass-card rounded-2xl border border-white/5 hover:border-green-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-green-500/5"
+                        className="p-6 glass-card rounded-2xl border border-black/5 dark:border-white/5 hover:border-green-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-green-500/5 group"
                     >
                         <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center border border-green-500/20 group-hover:scale-110 transition-transform">
-                            <Factory className="w-6 h-6 text-green-400" />
+                            <Factory className="w-6 h-6 text-green-500 dark:text-green-400" />
                         </div>
-                        <span className="text-sm font-bold tracking-wide">Consumo Materia Prima</span>
+                        <span className="text-sm font-bold tracking-wide text-slate-800 dark:text-white">Consumo Materia Prima</span>
                     </button>
 
                     <button
                         onClick={() => window.location.href = '/dashboard/audit'}
-                        className="p-6 glass-card rounded-2xl border border-white/5 hover:border-yellow-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-yellow-500/5"
+                        className="p-6 glass-card rounded-2xl border border-black/5 dark:border-white/5 hover:border-yellow-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-yellow-500/5 group"
                     >
                         <div className="w-12 h-12 bg-yellow-500/10 rounded-xl flex items-center justify-center border border-yellow-500/20 group-hover:scale-110 transition-transform">
-                            <CheckCircle2 className="w-6 h-6 text-yellow-400" />
+                            <CheckCircle2 className="w-6 h-6 text-yellow-500 dark:text-yellow-400" />
                         </div>
-                        <span className="text-sm font-bold tracking-wide">Auditoría</span>
+                        <span className="text-sm font-bold tracking-wide text-slate-800 dark:text-white">Auditoría</span>
                     </button>
 
                     <button
                         onClick={() => window.location.href = '/dashboard/indicators'}
-                        className="p-6 glass-card rounded-2xl border border-white/5 hover:border-red-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-red-500/5"
+                        className="p-6 glass-card rounded-2xl border border-black/5 dark:border-white/5 hover:border-red-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-red-500/5 group"
                     >
                         <div className="w-12 h-12 bg-red-500/10 rounded-xl flex items-center justify-center border border-red-500/20 group-hover:scale-110 transition-transform">
-                            <TrendingUp className="w-6 h-6 text-red-400" />
+                            <TrendingUp className="w-6 h-6 text-red-500 dark:text-red-400" />
                         </div>
-                        <span className="text-sm font-bold tracking-wide">Indicador</span>
+                        <span className="text-sm font-bold tracking-wide text-slate-800 dark:text-white">Indicador</span>
                     </button>
                 </div>
 
@@ -114,12 +114,12 @@ export default function DashboardPage() {
             </div>
 
             {selectedMold && (
-                <MoldDetails
-                    mold={selectedMold}
+                <AddMoldModal
+                    moldToEdit={selectedMold}
                     onClose={() => setSelectedMold(null)}
-                    onEdit={(mold) => {
-                        console.log('Edit mold:', mold);
-                        // Future implementation for editing
+                    onSuccess={() => {
+                        setSelectedMold(null)
+                        // Optionally refresh data if needed
                     }}
                 />
             )}

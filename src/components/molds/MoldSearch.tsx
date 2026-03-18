@@ -1,15 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase'
-import { Search, Loader2, Package } from 'lucide-react'
-
-interface Mold {
-    Nombre: string
-    'CODIGO MOLDE': string
-    ID: number
-    [key: string]: any
-}
+import { Search, Package, MapPin, Loader2 } from 'lucide-react'
+import { moldsService, Mold } from '@/services/molds.service'
 
 interface MoldSearchProps {
     onSelect: (mold: Mold) => void
@@ -19,83 +12,70 @@ export default function MoldSearch({ onSelect }: MoldSearchProps) {
     const [query, setQuery] = useState('')
     const [results, setResults] = useState<Mold[]>([])
     const [loading, setLoading] = useState(false)
-    const supabase = createClient()
+    const [allMolds, setAllMolds] = useState<Mold[]>([])
 
     useEffect(() => {
-        const searchMolds = async () => {
-            if (query.length < 2) {
-                setResults([])
-                return
-            }
-
-            setLoading(true)
+        const loadMolds = async () => {
             try {
-                const { data, error } = await supabase
-                    .from('base_datos_moldes')
-                    .select('*')
-                    .or(`Nombre.ilike.%${query}%, "CODIGO MOLDE".ilike.%${query}%`)
-                    .limit(10)
-
-                if (error) throw error
-                setResults(data || [])
+                const data = await moldsService.getAll()
+                setAllMolds(data)
             } catch (err) {
-                console.error('Error searching molds:', err)
-            } finally {
-                setLoading(false)
+                console.error(err)
             }
         }
+        loadMolds()
+    }, [])
 
-        const timer = setTimeout(searchMolds, 300)
-        return () => clearTimeout(timer)
-    }, [query])
+    useEffect(() => {
+        if (!query.trim()) {
+            setResults([])
+            return
+        }
+        const filtered = allMolds.filter(m => 
+            m.nombre_articulo?.toLowerCase().includes(query.toLowerCase()) ||
+            m.serial?.toLowerCase().includes(query.toLowerCase())
+        )
+        setResults(filtered.slice(0, 5))
+    }, [query, allMolds])
 
     return (
-        <div className="w-full max-w-2xl mx-auto space-y-4">
-            <div className="relative group">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+        <div className="relative w-full max-w-2xl mx-auto group">
+            <div className="relative">
+                <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
                 <input
                     type="text"
-                    placeholder="Buscar por nombre o código de molde..."
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all shadow-xl"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Buscar moldes por nombre o serial..."
+                    className="w-full bg-white dark:bg-slate-900 border border-black/5 dark:border-white/10 rounded-3xl py-6 pl-16 pr-8 text-lg font-medium shadow-xl shadow-black/5 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
                 />
-                {loading && (
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                        <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
-                    </div>
-                )}
             </div>
 
             {results.length > 0 && (
-                <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300">
-                    <div className="p-2">
-                        {results.map((mold, index) => (
-                            <button
-                                key={`${mold.ID}-${index}`}
-                                onClick={() => {
-                                    onSelect(mold)
-                                    setQuery('')
-                                    setResults([])
-                                }}
-                                className="w-full flex items-center gap-4 p-4 hover:bg-white/5 transition-colors rounded-xl text-left group"
-                            >
-                                <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center border border-blue-500/20 group-hover:border-blue-500/50 transition-colors">
-                                    <Package className="w-5 h-5 text-blue-400" />
+                <div className="absolute top-full left-0 right-0 mt-4 bg-white dark:bg-slate-900 border border-black/5 dark:border-white/10 rounded-[2rem] shadow-2xl overflow-hidden z-20 animate-in fade-in slide-in-from-top-4 duration-200">
+                    {results.map(mold => (
+                        <button
+                            key={mold.id}
+                            onClick={() => {
+                                onSelect(mold)
+                                setQuery('')
+                            }}
+                            className="w-full px-8 py-6 hover:bg-black/5 dark:hover:bg-white/5 transition-all text-left flex items-center justify-between group/item"
+                        >
+                            <div className="flex items-center gap-6">
+                                <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center group-hover/item:bg-blue-500 group-hover/item:text-white transition-all">
+                                    <Package className="w-6 h-6" />
                                 </div>
                                 <div>
-                                    <div className="text-white font-medium">{mold.Nombre}</div>
-                                    <div className="text-gray-500 text-sm">{mold['CODIGO MOLDE']}</div>
+                                    <div className="font-black text-slate-900 dark:text-white uppercase tracking-tight">{mold.nombre_articulo}</div>
+                                    <div className="text-[10px] font-mono text-gray-500 uppercase tracking-tighter">{mold.serial}</div>
                                 </div>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {query.length >= 2 && !loading && results.length === 0 && (
-                <div className="text-center p-8 bg-white/5 rounded-2xl border border-white/10">
-                    <p className="text-gray-500">No se encontraron moldes que coincidan con "{query}"</p>
+                            </div>
+                            <div className="px-4 py-1.5 rounded-full bg-black/5 dark:bg-white/5 text-[10px] font-black uppercase text-gray-400 group-hover/item:bg-blue-500/20 group-hover/item:text-blue-500 transition-all">
+                                {mold.estado}
+                            </div>
+                        </button>
+                    ))}
                 </div>
             )}
         </div>
