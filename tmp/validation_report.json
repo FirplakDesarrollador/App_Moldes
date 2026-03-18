@@ -1,0 +1,14 @@
+{
+    "total_db_moldes_count": 0,
+    "total_csv_unique_serials": 1450,
+    "csv_serials_found_in_db": 0,
+    "csv_serials_missing_in_db": 1450,
+    "sample_missing": [
+        "0004-05",
+        "0182-02",
+        "00740",
+        "00054",
+        "226-02"
+    ],
+    "sample_db_keys": []
+}

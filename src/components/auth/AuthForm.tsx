@@ -141,7 +141,7 @@ export default function AuthForm() {
                     <img
                         src="/logo-firplak.png"
                         alt="Firplak Logo"
-                        className="h-full object-contain filter drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]"
+                        className="h-full object-contain filter drop-shadow-[0_0_8px_rgba(0,0,0,0.1)] dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.2)] invert-0 dark:invert-0 brightness-0 dark:brightness-100"
                         onError={(e) => {
                             // Fallback if image not found
                             e.currentTarget.style.display = 'none';
@@ -153,9 +153,9 @@ export default function AuthForm() {
                     <div className="w-8 h-8 bg-blue-600/20 rounded-lg flex items-center justify-center border border-blue-500/30">
                         <Settings className="w-4 h-4 text-blue-500 animate-spin-slow" />
                     </div>
-                    <h1 className="text-xl font-bold tracking-tight text-white uppercase tracking-wider flex items-center gap-2">
+                    <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
                         MoldApp
-                        <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/20">V2.1</span>
+                        <span className="text-[10px] bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-500/20">V2.2</span>
                     </h1>
                 </div>
                 <p className="text-gray-500 text-[10px] uppercase tracking-[0.3em] mt-3 font-semibold">Control Interno de Producción</p>
@@ -168,23 +168,23 @@ export default function AuthForm() {
                         <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
                         <div
                             onClick={() => setShowDropdown(!showDropdown)}
-                            className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-12 pr-10 text-white cursor-pointer flex items-center justify-between min-h-[50px]"
+                            className="w-full bg-white/50 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl py-3 pl-12 pr-10 text-slate-900 dark:text-white cursor-pointer flex items-center justify-between min-h-[50px] shadow-sm"
                         >
-                            <span className={selectedEmployee ? 'text-white' : 'text-gray-600'}>
+                            <span className={selectedEmployee ? 'text-slate-900 dark:text-white' : 'text-gray-500 dark:text-gray-600'}>
                                 {selectedEmployee ? selectedEmployee.Nombre : 'Busca tu nombre...'}
                             </span>
                             <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
                         </div>
 
                         {showDropdown && (
-                            <div className="absolute z-50 w-full mt-2 bg-[#121212] border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                                <div className="p-2 border-b border-white/5">
+                            <div className="absolute z-50 w-full mt-2 bg-white dark:bg-[#121212] border border-black/10 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                <div className="p-2 border-b border-black/5 dark:border-white/5">
                                     <div className="relative">
                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                                         <input
                                             type="text"
                                             placeholder="Escribe tu nombre..."
-                                            className="w-full bg-white/5 border border-white/10 rounded-lg py-2 pl-9 pr-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                                            className="w-full bg-slate-50 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg py-2 pl-9 pr-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                                             value={searchQuery}
                                             onChange={(e) => setSearchQuery(e.target.value)}
                                             autoFocus
@@ -205,7 +205,7 @@ export default function AuthForm() {
                                                 className="flex items-center justify-between px-4 py-3 hover:bg-blue-600/20 rounded-lg cursor-pointer transition-colors group"
                                             >
                                                 <div>
-                                                    <p className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors">{emp.Nombre || 'Sin Nombre'}</p>
+                                                    <p className="text-sm font-medium text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{emp.Nombre || 'Sin Nombre'}</p>
                                                     <p className="text-[10px] text-gray-500 uppercase tracking-tighter">{emp.Planta || 'MOLDES'} — {emp.Area || 'EXTERNO'}</p>
                                                 </div>
                                                 {selectedEmployee?.Cedula === emp.Cedula && (
@@ -229,7 +229,7 @@ export default function AuthForm() {
                         <input
                             type="password"
                             placeholder="Ingresa tu número de identificación"
-                            className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-mono tracking-widest"
+                            className="w-full bg-white/50 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl py-3 pl-12 pr-4 text-slate-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-mono tracking-widest shadow-sm"
                             value={cedulaInput}
                             onChange={(e) => setCedulaInput(e.target.value)}
                             required
@@ -249,7 +249,7 @@ export default function AuthForm() {
                     className={`w-full py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg 
             ${selectedEmployee
                             ? 'accent-gradient text-white hover:shadow-blue-500/20 active:scale-[0.98]'
-                            : 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5'}`}
+                            : 'bg-black/5 dark:bg-white/5 text-gray-500 cursor-not-allowed border border-black/5 dark:border-white/5'}`}
                 >
                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Ingresar al Sistema'}
                 </button>

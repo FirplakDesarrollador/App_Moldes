@@ -13,7 +13,8 @@ async function checkTables() {
         'Base_datos_personal',
         'Base_datos_personal_dinámica',
         'Personal_completa',
-        'Hoja1' // Common if imported from Excel
+        'Hoja1',
+        'moldes'
     ]
 
     for (const name of tableNames) {

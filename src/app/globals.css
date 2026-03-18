@@ -3,8 +3,19 @@
 @tailwind utilities;
 
 :root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --gradient-from: #f1f5f9;
+  --gradient-to: #e2e8f0;
+}
+
+.dark,
+html.dark,
+[data-theme='dark'] {
   --background: #0a0a0a;
   --foreground: #ededed;
+  --gradient-from: #1a1a1a;
+  --gradient-to: #0a0a0a;
 }
 
 body {
@@ -13,19 +24,19 @@ body {
   font-family: Arial, Helvetica, sans-serif;
   margin: 0;
   padding: 0;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  @apply backdrop-blur-xl border shadow-lg transition-all duration-300;
+  background-color: color-mix(in srgb, var(--background), transparent 80%);
+  border-color: color-mix(in srgb, var(--foreground), transparent 90%);
 }
 
 .premium-gradient {
-  background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%) !important;
+  background: linear-gradient(135deg, var(--gradient-from) 0%, var(--gradient-to) 100%) !important;
 }
 
 .accent-gradient {
-  background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
+  @apply bg-gradient-to-r from-blue-500 to-violet-500;
 }

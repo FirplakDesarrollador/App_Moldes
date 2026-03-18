@@ -17,7 +17,7 @@ export default function MoldsPage() {
     }, [])
 
     return (
-        <main className="min-h-screen bg-[#050505] text-white selection:bg-blue-500/30">
+        <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)] selection:bg-blue-500/30">
             <Navbar
                 user={user}
                 showBackButton
@@ -33,19 +33,19 @@ export default function MoldsPage() {
 
             {/* Footer Placeholders for other modules */}
             <div className="max-w-7xl mx-auto px-6 pb-12">
-                <div className="border-t border-white/5 pt-12">
+                <div className="border-t border-black/5 dark:border-white/5 pt-12">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 opacity-40 grayscale">
-                        <div className="p-6 bg-white/5 rounded-[2rem] border border-white/5">
+                        <div className="p-6 glass-card rounded-[2rem]">
                             <h4 className="font-bold mb-2">Histórico</h4>
-                            <p className="text-xs text-gray-500">Módulo de trazabilidad y moldes cerrados.</p>
+                            <p className="text-xs text-slate-500 dark:text-gray-500">Módulo de trazabilidad y moldes cerrados.</p>
                         </div>
-                        <div className="p-6 bg-white/5 rounded-[2rem] border border-white/5">
+                        <div className="p-6 glass-card rounded-[2rem]">
                             <h4 className="font-bold mb-2">Consumo</h4>
-                            <p className="text-xs text-gray-500">Gestión de resinas, fibras y materiales.</p>
+                            <p className="text-xs text-slate-500 dark:text-gray-500">Gestión de resinas, fibras y materiales.</p>
                         </div>
-                        <div className="p-6 bg-white/5 rounded-[2rem] border border-white/5">
+                        <div className="p-6 glass-card rounded-[2rem]">
                             <h4 className="font-bold mb-2">Auditoría</h4>
-                            <p className="text-xs text-gray-500">Puntos de control y calidad final.</p>
+                            <p className="text-xs text-slate-500 dark:text-gray-500">Puntos de control y calidad final.</p>
                         </div>
                     </div>
                 </div>

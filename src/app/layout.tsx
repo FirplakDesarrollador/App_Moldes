@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { SAPProvider } from "@/context/SAPContext";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import SAPStatusHeader from "@/components/SAPStatusHeader";
 
 export const metadata: Metadata = {
@@ -14,11 +15,17 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="es">
+        <html lang="es" suppressHydrationWarning>
             <body className="antialiased premium-gradient min-h-screen">
-                <SAPProvider>
-                    {children}
-                </SAPProvider>
+                <ThemeProvider
+                    attribute="class"
+                    defaultTheme="light"
+                    enableSystem={false}
+                >
+                    <SAPProvider>
+                        {children}
+                    </SAPProvider>
+                </ThemeProvider>
             </body>
         </html>
     );
