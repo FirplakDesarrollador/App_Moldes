@@ -36,6 +36,12 @@ export default function RegistrosMoldesPage() {
     const [isSaving, setIsSaving] = useState(false)
     const [defectSearch, setDefectSearch] = useState('')
     const [isCreateMode, setIsCreateMode] = useState(false)
+
+    // Mold Search State
+    const [moldSearchQuery, setMoldSearchQuery] = useState('')
+    const [moldSearchResults, setMoldSearchResults] = useState<any[]>([])
+    const [isSearchingMolds, setIsSearchingMolds] = useState(false)
+    const [showMoldResults, setShowMoldResults] = useState(false)
     
     // Timer for debounced search
     const searchTimeout = useRef<NodeJS.Timeout | null>(null)
@@ -179,6 +185,8 @@ export default function RegistrosMoldesPage() {
             "H altura de pestaña": record['H altura de pestaña'] || ''
         })
         setDefectSearch('')
+        setMoldSearchResults([])
+        setShowMoldResults(false)
     }
 
     const handleCreateClick = () => {
@@ -203,6 +211,8 @@ export default function RegistrosMoldesPage() {
             "H altura de pestaña": ''
         })
         setDefectSearch('')
+        setMoldSearchResults([])
+        setShowMoldResults(false)
     }
 
     const handleUpdateRecord = async () => {
@@ -240,6 +250,36 @@ export default function RegistrosMoldesPage() {
         } finally {
             setIsSaving(false)
         }
+    }
+
+    const handleMoldSearch = async (query: string) => {
+        setEditForm((prev: any) => ({ ...prev, "CODIGO MOLDE": query.toUpperCase() }))
+        
+        if (query.trim().length < 2) {
+            setMoldSearchResults([])
+            setShowMoldResults(false)
+            return
+        }
+
+        setIsSearchingMolds(true)
+        setShowMoldResults(true)
+        try {
+            const results = await moldsService.searchMolds(query)
+            setMoldSearchResults(results || [])
+        } catch (error) {
+            console.error('Error searching molds:', error)
+        } finally {
+            setIsSearchingMolds(false)
+        }
+    }
+
+    const handleSelectMold = (mold: any) => {
+        setEditForm((prev: any) => ({
+            ...prev,
+            "CODIGO MOLDE": mold.serial,
+            "Nombre": mold.nombre_articulo
+        }))
+        setShowMoldResults(false)
     }
 
     return (
@@ -532,15 +572,58 @@ export default function RegistrosMoldesPage() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 
                                 {/* CODIGO MOLDE */}
-                                <div className="space-y-2">
+                                <div className="space-y-2 relative group-mold-search">
                                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Código del Molde</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Ej: M-1234"
-                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-3 px-4 text-xs font-bold focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none uppercase"
-                                        value={editForm['CODIGO MOLDE'] || ''}
-                                        onChange={(e) => setEditForm({ ...editForm, "CODIGO MOLDE": e.target.value.toUpperCase() })}
-                                    />
+                                    <div className="relative">
+                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar por serie o nombre..."
+                                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-3 pl-12 pr-4 text-xs font-bold focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none uppercase"
+                                            value={editForm['CODIGO MOLDE'] || ''}
+                                            onChange={(e) => handleMoldSearch(e.target.value)}
+                                            onFocus={() => {
+                                                if (editForm['CODIGO MOLDE']?.length >= 2) setShowMoldResults(true)
+                                            }}
+                                        />
+                                        {isSearchingMolds && (
+                                            <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                                <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* MOLD SEARCH RESULTS DROPDOWN */}
+                                    {showMoldResults && (moldSearchResults.length > 0 || isSearchingMolds) && (
+                                        <div className="absolute z-[110] left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200">
+                                            {moldSearchResults.map((mold, idx) => (
+                                                <button
+                                                    key={mold.id || idx}
+                                                    type="button"
+                                                    onClick={() => handleSelectMold(mold)}
+                                                    className="w-full text-left p-4 hover:bg-slate-50 dark:hover:bg-slate-800 flex flex-col gap-1 border-b border-slate-100 dark:border-slate-800 last:border-0 transition-colors"
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[11px] font-black text-blue-500 uppercase tracking-tight">{mold.serial}</span>
+                                                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                                                            mold.estado?.toLowerCase().includes('disp') ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'
+                                                        }`}>
+                                                            {mold.estado}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase line-clamp-1">{mold.nombre_articulo}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* CLOSE SEARCH WHEN CLICKING AWAY - handled by simple blur or user selection */}
+                                    {showMoldResults && (
+                                        <div 
+                                            className="fixed inset-0 z-[105]" 
+                                            onClick={() => setShowMoldResults(false)}
+                                        />
+                                    )}
                                 </div>
 
                                 {/* NOMBRE / REFERENCIA */}

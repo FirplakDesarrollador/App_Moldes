@@ -1,7 +1,7 @@
 'use client' // Force rebuild 2026-03-17 
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Plus, Search, Loader2, Package, Tag, Edit3, Settings2 } from 'lucide-react'
+import { Plus, Search, Loader2, Package, Edit3 } from 'lucide-react'
 import { moldsService, Mold } from '@/services/molds.service'
 import AddMoldModal from './AddMoldModal'
 
@@ -11,7 +11,7 @@ export default function MoldsModule() {
     const [showAddModal, setShowAddModal] = useState(false)
     const [editingMold, setEditingMold] = useState<Mold | null>(null)
     const [searchQuery, setSearchQuery] = useState('')
-    const [repairFilter, setRepairFilter] = useState<'TODO' | 'REPARACION_RAPIDA' | 'REPARACION_ESPECIAL'>('TODO')
+
 
     const isFetchingRef = useRef(false)
 
@@ -46,23 +46,7 @@ export default function MoldsModule() {
         
         if (!matchesSearch) return false
 
-        let matchesRepair = true
-        if (repairFilter !== 'TODO') {
-            const tipoRep = (m.Tipo_de_reparacion || '').toUpperCase()
-            const defectoStr = (m.Observaciones_reparacion || '').toUpperCase()
-
-            const isEspecial = tipoRep.includes('ESPECIAL') ||
-                              defectoStr.includes('NUEVO') ||
-                              defectoStr.includes('DESTRUCCION')
-
-            if (repairFilter === 'REPARACION_ESPECIAL') {
-                matchesRepair = isEspecial
-            } else if (repairFilter === 'REPARACION_RAPIDA') {
-                matchesRepair = !isEspecial
-            }
-        }
-
-        return matchesRepair
+        return true
     }).sort((a, b) => {
         const statusA = (a.estado || '').toUpperCase().includes('REPARACION') ? 1 : 0
         const statusB = (b.estado || '').toUpperCase().includes('REPARACION') ? 1 : 0
@@ -85,17 +69,7 @@ export default function MoldsModule() {
     return (
         <div className="space-y-8 animate-in fade-in duration-700 p-4 md:p-8">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-                <div className="flex items-center gap-2 bg-black/5 dark:bg-white/5 p-1.5 rounded-[2rem] border border-black/10 dark:border-white/10 shadow-inner">
-                    {(['TODO', 'REPARACION_RAPIDA', 'REPARACION_ESPECIAL'] as const).map(tab => (
-                        <button
-                            key={tab}
-                            onClick={() => setRepairFilter(tab)}
-                            className={`px-8 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${repairFilter === tab ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-slate-500 dark:text-gray-500 hover:text-slate-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'}`}
-                        >
-                            {tab.replace(/_/g, ' ')}
-                        </button>
-                    ))}
-                </div>
+
                 <button
                     onClick={() => setShowAddModal(true)}
                     className="bg-blue-600 hover:bg-blue-500 text-white px-10 py-5 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-blue-600/20 flex items-center gap-3 active:scale-[0.98] transition-all"

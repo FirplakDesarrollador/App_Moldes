@@ -119,7 +119,7 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
                             </label>
                             <input
                                 required
-                                value={formData.nombre_articulo}
+                                value={formData.nombre_articulo || ''}
                                 onChange={e => setFormData({ ...formData, nombre_articulo: e.target.value })}
                                 className="w-full bg-black/5 dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-2xl py-5 px-8 font-bold text-slate-900 dark:text-white focus:ring-4 focus:ring-blue-500/20 outline-none transition-all placeholder:text-gray-400"
                                 placeholder="Ej: Jabonera Leaf"
@@ -131,7 +131,7 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
                             </label>
                             <input
                                 required
-                                value={formData.serial}
+                                value={formData.serial || ''}
                                 onChange={e => setFormData({ ...formData, serial: e.target.value })}
                                 className="w-full bg-black/5 dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-2xl py-5 px-8 font-bold text-slate-900 dark:text-white focus:ring-4 focus:ring-blue-500/20 outline-none transition-all uppercase"
                                 placeholder="Ej: ML-001"
@@ -143,7 +143,7 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
                         <div className="space-y-4">
                             <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Estado Operativo</label>
                             <select
-                                value={formData.estado}
+                                value={formData.estado || ''}
                                 onChange={e => setFormData({ ...formData, estado: e.target.value })}
                                 className="w-full bg-black/5 dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-2xl py-5 px-8 font-bold text-slate-900 dark:text-white outline-none appearance-none"
                             >
@@ -158,7 +158,7 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
                         <div className="space-y-4">
                             <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Estado Reparación</label>
                             <select
-                                value={formData.Estado_reparacion}
+                                value={formData.Estado_reparacion || ''}
                                 onChange={e => setFormData({ ...formData, Estado_reparacion: e.target.value })}
                                 className="w-full bg-black/5 dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-2xl py-5 px-8 font-bold text-slate-900 dark:text-white outline-none appearance-none"
                             >
@@ -179,7 +179,7 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
                                         <User className="w-3 h-3 text-blue-500" /> Responsable Asignado
                                     </label>
                                     <select
-                                        value={formData.Responsable}
+                                        value={formData.Responsable || ''}
                                         onChange={e => setFormData({ ...formData, Responsable: e.target.value })}
                                         className="w-full bg-black/5 dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-2xl py-5 px-8 font-bold text-slate-900 dark:text-white outline-none appearance-none"
                                     >
@@ -213,7 +213,7 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
                                         <Calendar className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" />
                                         <input
                                             type="date"
-                                            value={formData.Fecha_de_ingreso}
+                                            value={formData.Fecha_de_ingreso || ''}
                                             onChange={e => setFormData({ ...formData, Fecha_de_ingreso: e.target.value })}
                                             className="w-full bg-black/5 dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-2xl py-5 pl-14 pr-6 font-bold text-slate-900 dark:text-white outline-none"
                                         />
@@ -224,7 +224,7 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
                                     <input
                                         disabled
                                         type="date"
-                                        value={formData.Fecha_esperada}
+                                        value={formData.Fecha_esperada || ''}
                                         className="w-full bg-black/5 dark:bg-white/[0.01] border border-black/5 dark:border-white/5 rounded-2xl py-5 px-8 font-bold text-gray-500 cursor-not-allowed"
                                     />
                                 </div>
@@ -232,7 +232,7 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
                                     <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Fecha Real Entrega</label>
                                     <input
                                         type="date"
-                                        value={formData.Fecha_de_entrega}
+                                        value={formData.Fecha_de_entrega || ''}
                                         onChange={e => setFormData({ ...formData, Fecha_de_entrega: e.target.value })}
                                         className="w-full bg-black/5 dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-2xl py-5 px-8 font-bold text-slate-900 dark:text-white outline-none"
                                     />
@@ -268,7 +268,7 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
                              Observaciones Técnicas / Detalles de la Reparación
                         </label>
                         <textarea
-                            value={formData.Observaciones_reparacion}
+                            value={formData.Observaciones_reparacion || ''}
                             onChange={e => setFormData({ ...formData, Observaciones_reparacion: e.target.value })}
                             className="w-full bg-black/5 dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-[3rem] py-8 px-10 font-bold text-slate-900 dark:text-white focus:ring-4 focus:ring-blue-500/20 outline-none transition-all h-60 resize-none placeholder:text-gray-700"
                             placeholder="Describa el estado actual, piezas requeridas y trabajos realizados..."

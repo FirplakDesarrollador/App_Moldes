@@ -209,7 +209,7 @@ export default function AuditPage() {
 
     return (
         <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
-            <Navbar user={user} showBackButton backPath="/dashboard" title="Auditoría" subtitle="PV_MOLDES V2.3" />
+            <Navbar user={user} showBackButton backPath="/dashboard" title="Auditoría" subtitle="PV_MOLDES V2.4" />
 
             <main className="pt-32 pb-28 px-4 max-w-6xl mx-auto">
                 <div className="space-y-8">
