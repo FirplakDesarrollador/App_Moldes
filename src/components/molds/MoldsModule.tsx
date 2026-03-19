@@ -128,7 +128,7 @@ export default function MoldsModule() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredMolds.map((mold) => (
                         <div
-                            key={mold.id}
+                            key={mold.id || mold.serial || `mold-${mold.nombre_articulo}`}
                             onClick={() => setEditingMold(mold)}
                             className="group relative bg-white dark:bg-[#0a0a0a] border border-black/5 dark:border-white/5 rounded-[2.8rem] p-8 hover:border-blue-500/30 transition-all cursor-pointer flex flex-col shadow-[0_10px_40px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_50px_rgba(37,99,235,0.05)]"
                         >

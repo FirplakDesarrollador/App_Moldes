@@ -55,7 +55,7 @@ export default function MoldSearch({ onSelect }: MoldSearchProps) {
                 <div className="absolute top-full left-0 right-0 mt-4 bg-white dark:bg-slate-900 border border-black/5 dark:border-white/10 rounded-[2rem] shadow-2xl overflow-hidden z-20 animate-in fade-in slide-in-from-top-4 duration-200">
                     {results.map(mold => (
                         <button
-                            key={mold.id}
+                            key={mold.id || mold.serial || `search-${mold.nombre_articulo}`}
                             onClick={() => {
                                 onSelect(mold)
                                 setQuery('')
