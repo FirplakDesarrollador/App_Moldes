@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase'
+import { createClient, createClientTH } from '@/lib/supabase'
 
 export interface Mold {
     id?: number
@@ -228,5 +228,50 @@ export const moldsService = {
             return []
         }
         return data
+    },
+
+    // Actualizar registro histórico de molde
+    async updateRegistroMolde(id: string | number, payload: any) {
+        const supabase = createClient()
+        const { error } = await supabase
+            .from('registros_moldes')
+            .update(payload)
+            .eq('ID', id)
+
+        if (error) {
+            console.error('Error updating registro molde:', error)
+            throw error
+        }
+    },
+    
+    // Crear nuevo registro histórico
+    async createRegistroMolde(payload: any) {
+        const supabase = createClient()
+        const { data, error } = await supabase
+            .from('registros_moldes')
+            .insert([payload])
+            .select()
+        
+        if (error) {
+            console.error('Error creating registro molde:', error)
+            throw error
+        }
+        return data?.[0]
+    },
+
+    // Obtener supervisores, jefes y lideres (tabla empleados)
+    async getSupervisorsAndLeaders() {
+        const supabaseTH = createClientTH()
+        const { data, error } = await supabaseTH
+            .from('empleados')
+            .select('id, nombreCompleto, cargo')
+            .or('cargo.ilike.supervisor,cargo.ilike.jefe,cargo.ilike.lider')
+            .order('nombreCompleto', { ascending: true })
+
+        if (error) {
+            console.error('Error fetching supervisors/leaders:', error)
+            return []
+        }
+        return data || []
     }
 }

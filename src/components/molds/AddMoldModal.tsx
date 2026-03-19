@@ -184,8 +184,8 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
                                         className="w-full bg-black/5 dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-2xl py-5 px-8 font-bold text-slate-900 dark:text-white outline-none appearance-none"
                                     >
                                         <option value="">No Asignado</option>
-                                        {personnel.map(p => (
-                                            <option key={p.ID} value={p.NombreCompleto}>{p.NombreCompleto}</option>
+                                        {personnel.map((p, idx) => (
+                                            <option key={p.Cedula || p.NombreCompleto || idx} value={p.NombreCompleto}>{p.NombreCompleto}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -242,9 +242,9 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
                             <div className="space-y-6 pt-4">
                                 <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Defectos a Intervenir</label>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    {defectsCatalog.map(d => (
+                                    {defectsCatalog.map((d, idx) => (
                                         <button
-                                            key={d.id || d.Título}
+                                            key={d.id || d.Título || idx}
                                             type="button"
                                             onClick={() => {
                                                 const current = selectedDefects.includes(d.Título)
@@ -276,7 +276,7 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
                     </div>
 
                     {isEditing && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-10 border-t border-black/5 dark:border-white/5 bg-blue-500/[0.02] rounded-[3rem] p-10 border border-blue-500/10">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-10 bg-blue-500/[0.02] rounded-[3rem] p-10 border border-blue-500/10 dark:border-white/5">
                             <div className="space-y-4">
                                 <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest ml-1 flex items-center gap-2">
                                     <User className="w-3 h-3" /> Última Modificación Realizada Por
