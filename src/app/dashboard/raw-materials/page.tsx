@@ -42,16 +42,22 @@ export default function RawMaterialsPage() {
                     onClick={() => router.push('/dashboard/molds')}
                     className="flex items-center gap-2 px-6 py-3 text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-2xl transition-all font-bold text-xs"
                 >
-                    <Package className="w-4 h-4" /> Moldes
+                    <Package className="w-4 h-4" /> MOLDES
                 </button>
                 <div className="px-6 py-3 bg-black/5 dark:bg-white/10 text-slate-900 dark:text-white rounded-2xl transition-all font-black text-xs flex items-center gap-2 shadow-lg dark:shadow-white/5">
-                    <TrendingUp className="w-4 h-4 text-green-500 dark:text-green-400" /> Consumo
+                    <TrendingUp className="w-4 h-4 text-green-500 dark:text-green-400" /> CONSUMO
                 </div>
-                <button className="flex items-center gap-2 px-6 py-3 text-slate-500/50 dark:text-gray-400/50 cursor-not-allowed rounded-2xl transition-all font-bold text-xs">
-                    <ClipboardList className="w-4 h-4" /> Histórico
+                <button 
+                    onClick={() => router.push('/dashboard/history')}
+                    className="flex items-center gap-2 px-6 py-3 text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-2xl transition-all font-bold text-xs"
+                >
+                    <ClipboardList className="w-4 h-4" /> REGISTRO
                 </button>
-                <button className="flex items-center gap-2 px-6 py-3 text-slate-500/50 dark:text-gray-400/50 cursor-not-allowed rounded-2xl transition-all font-bold text-xs">
-                    <Activity className="w-4 h-4" /> Auditoría
+                <button 
+                    onClick={() => router.push('/dashboard/audit')}
+                    className="flex items-center gap-2 px-6 py-3 text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-2xl transition-all font-bold text-xs"
+                >
+                    <Activity className="w-4 h-4" /> AUDITORIA
                 </button>
             </div>
         </div>

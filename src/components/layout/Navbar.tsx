@@ -57,7 +57,7 @@ export default function Navbar({
                         <div className="flex flex-col">
                             <div className="flex items-center gap-2">
                                 <span className="text-xl font-black tracking-tighter leading-none text-[var(--foreground)]">{title}</span>
-                                <span className="text-[9px] bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 px-1.2 py-0.2 rounded border border-blue-200 dark:border-blue-500/10 font-bold">V2.2</span>
+                                <span className="text-[9px] bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 px-1.2 py-0.2 rounded border border-blue-200 dark:border-blue-500/10 font-bold">V2.3</span>
                             </div>
                             <span className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">{subtitle}</span>
                         </div>
