@@ -1,3 +1,4 @@
+-- PV_MOLDES V2.4
 INSERT INTO public.moldes (serial, nombre_articulo, estado, vueltas_actuales, tipo_molde_id) VALUES ('202-01', 'MOLDE LAVAMANOS ECO 40X30', 'En uso', 0, (SELECT id FROM public.tipos_moldes WHERE upper(molde_descripcion) = upper('MOLDE LAVAMANOS ECO 40X30') LIMIT 1)) ON CONFLICT (serial) DO NOTHING;
 INSERT INTO public.moldes (serial, nombre_articulo, estado, vueltas_actuales, tipo_molde_id) VALUES ('202-06', 'MOLDE LAVAMANOS ECO 40X30', 'En uso', 0, (SELECT id FROM public.tipos_moldes WHERE upper(molde_descripcion) = upper('MOLDE LAVAMANOS ECO 40X30') LIMIT 1)) ON CONFLICT (serial) DO NOTHING;
 INSERT INTO public.moldes (serial, nombre_articulo, estado, vueltas_actuales, tipo_molde_id) VALUES ('00944', 'MOLDE MESON ECO 150X55 MATE SIN PERF', 'En uso', 0, (SELECT id FROM public.tipos_moldes WHERE upper(molde_descripcion) = upper('MOLDE MESON ECO 150X55 MATE SIN PERF') LIMIT 1)) ON CONFLICT (serial) DO NOTHING;

@@ -1,3 +1,4 @@
+// PV_MOLDES V2.4
 'use client' // Force rebuild 2026-03-17 
 
 import { useState, useEffect, useRef, useCallback } from 'react'

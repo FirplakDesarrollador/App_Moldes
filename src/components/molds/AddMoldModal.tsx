@@ -1,7 +1,8 @@
+// PV_MOLDES V2.4
 'use client'
 
-import { useState, useEffect } from 'react'
-import { X, Loader2, Save, Calendar, User, Tag, Clock, Package } from 'lucide-react'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { X, Loader2, Save, Calendar, User, Tag, Clock, Package, Search } from 'lucide-react'
 import { moldsService, Mold } from '@/services/molds.service'
 
 interface AddMoldModalProps {
@@ -16,6 +17,16 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
     const [personnel, setPersonnel] = useState<any[]>([])
     const [defectsCatalog, setDefectsCatalog] = useState<any[]>([])
     const [selectedDefects, setSelectedDefects] = useState<string[]>([])
+    const [defectSearch, setDefectSearch] = useState('')
+    const [showDefectDropdown, setShowDefectDropdown] = useState(false)
+    const defectInputRef = useRef<HTMLInputElement>(null)
+
+    const unselectedDefects = useMemo(() => {
+        const search = defectSearch.toLowerCase()
+        return defectsCatalog
+            .filter(d => !selectedDefects.includes(d.Título))
+            .filter(d => d.Título?.toLowerCase().includes(search))
+    }, [defectsCatalog, selectedDefects, defectSearch])
 
     const [formData, setFormData] = useState<Partial<Mold>>({
         nombre_articulo: '',
@@ -69,7 +80,7 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
         try {
             const userStr = localStorage.getItem('moldapp_user')
             const currentUser = userStr ? JSON.parse(userStr).Nombre : 'Sistema'
-            
+
             const dbRecord: Mold = {
                 ...(formData as Mold),
                 modified_at: new Date().toISOString(),
@@ -173,7 +184,7 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
 
                     {!isEditing && (
                         <>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-10 border-t border-black/5 dark:border-white/5">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-6 border-t border-black/5 dark:border-white/5">
                                 <div className="space-y-4">
                                     <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-2">
                                         <User className="w-3 h-3 text-blue-500" /> Responsable Asignado
@@ -219,13 +230,13 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
                                         />
                                     </div>
                                 </div>
-                                <div className="space-y-4 opacity-70">
+                                <div className="space-y-4">
                                     <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Fecha Esperada</label>
                                     <input
                                         disabled
                                         type="date"
                                         value={formData.Fecha_esperada || ''}
-                                        className="w-full bg-black/5 dark:bg-white/[0.01] border border-black/5 dark:border-white/5 rounded-2xl py-5 px-8 font-bold text-gray-500 cursor-not-allowed"
+                                        className="w-full bg-black/5 dark:bg-white/[0.01] border border-black/5 dark:border-white/5 rounded-2xl py-5 px-8 font-bold text-gray-400 cursor-not-allowed uppercase"
                                     />
                                 </div>
                                 <div className="space-y-4">
@@ -239,25 +250,66 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
                                 </div>
                             </div>
 
-                            <div className="space-y-6 pt-4">
+                            <div className="space-y-6 pt-4 relative" onClick={e => e.stopPropagation()}>
                                 <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Defectos a Intervenir</label>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    {defectsCatalog.map((d, idx) => (
-                                        <button
-                                            key={d.id || d.Título || idx}
-                                            type="button"
-                                            onClick={() => {
-                                                const current = selectedDefects.includes(d.Título)
-                                                    ? selectedDefects.filter(x => x !== d.Título)
-                                                    : [...selectedDefects, d.Título]
-                                                setSelectedDefects(current)
-                                                setFormData({ ...formData, Observaciones_reparacion: current.join(', ') })
-                                            }}
-                                            className={`p-4 rounded-2xl border-2 text-[10px] font-black text-left transition-all ${selectedDefects.includes(d.Título) ? 'bg-blue-600 border-blue-600 text-white shadow-xl shadow-blue-600/30' : 'bg-black/5 dark:bg-white/5 border-transparent text-gray-500'}`}
-                                        >
-                                            {d.Título}
-                                        </button>
+                                
+                                <div className="flex flex-wrap gap-2 mb-4">
+                                    {selectedDefects.map(d => (
+                                        <span key={d} className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 text-blue-500 border border-blue-500/20 rounded-full text-xs font-bold">
+                                            {d}
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const news = selectedDefects.filter(x => x !== d)
+                                                    setSelectedDefects(news)
+                                                    setFormData({ ...formData, Observaciones_reparacion: news.join(', ') })
+                                                }}
+                                                className="hover:bg-blue-500/20 rounded-full p-0.5"
+                                            >
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        </span>
                                     ))}
+                                </div>
+
+                                <div className="relative">
+                                    <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                    <input
+                                        ref={defectInputRef}
+                                        type="text"
+                                        value={defectSearch}
+                                        onChange={e => {
+                                            setDefectSearch(e.target.value)
+                                            setShowDefectDropdown(true)
+                                        }}
+                                        onFocus={() => setShowDefectDropdown(true)}
+                                        placeholder="Buscar o agregar defectos..."
+                                        className="w-full bg-black/5 dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-2xl py-5 pl-14 pr-8 font-bold text-slate-900 dark:text-white focus:ring-4 focus:ring-blue-500/20 outline-none transition-all"
+                                    />
+                                    {showDefectDropdown && (
+                                        <div className="absolute top-100 left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-black/10 dark:border-white/10 rounded-2xl shadow-xl z-[60] overflow-hidden max-h-60 overflow-y-auto">
+                                            {unselectedDefects.length > 0 ? (
+                                                unselectedDefects.map(d => (
+                                                    <button
+                                                        key={d.id || d.Título}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const news = [...selectedDefects, d.Título]
+                                                            setSelectedDefects(news)
+                                                            setFormData({ ...formData, Observaciones_reparacion: news.join(', ') })
+                                                            setDefectSearch('')
+                                                            setShowDefectDropdown(false)
+                                                        }}
+                                                        className="w-full text-left px-8 py-4 hover:bg-black/5 dark:hover:bg-white/5 font-bold text-xs transition-colors"
+                                                    >
+                                                        {d.Título}
+                                                    </button>
+                                                ))
+                                            ) : (
+                                                <div className="px-8 py-4 text-xs text-gray-400 font-bold italic">No hay más defectos disponibles</div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </>
@@ -265,7 +317,7 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
 
                     <div className="space-y-6 pt-10 border-t border-black/5 dark:border-white/5">
                         <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-2">
-                             Observaciones Técnicas / Detalles de la Reparación
+                            Observaciones Técnicas / Detalles de la Reparación
                         </label>
                         <textarea
                             value={formData.Observaciones_reparacion || ''}

@@ -1,3 +1,4 @@
+-- PV_MOLDES V2.4
 INSERT INTO public.moldes (serial, nombre_articulo, estado, vueltas_actuales, tipo_molde_id) VALUES ('01116', 'MOLDE ZOCALO 122X6 BRILLANTE', 'Indefinido', 0, (SELECT id FROM public.tipos_moldes WHERE upper(molde_descripcion) = upper('MOLDE ZOCALO 122X6 BRILLANTE') LIMIT 1)) ON CONFLICT (serial) DO NOTHING;
 INSERT INTO public.moldes (serial, nombre_articulo, estado, vueltas_actuales, tipo_molde_id) VALUES ('01117', 'MOLDE ZOCALO 122X6 BRILLANTE', 'Indefinido', 0, (SELECT id FROM public.tipos_moldes WHERE upper(molde_descripcion) = upper('MOLDE ZOCALO 122X6 BRILLANTE') LIMIT 1)) ON CONFLICT (serial) DO NOTHING;
 INSERT INTO public.moldes (serial, nombre_articulo, estado, vueltas_actuales, tipo_molde_id) VALUES ('00057', 'MOLDE ZOCALO 122X10 BRILLANTE', 'Indefinido', 0, (SELECT id FROM public.tipos_moldes WHERE upper(molde_descripcion) = upper('MOLDE ZOCALO 122X10 BRILLANTE') LIMIT 1)) ON CONFLICT (serial) DO NOTHING;

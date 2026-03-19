@@ -1,3 +1,4 @@
+// PV_MOLDES V2.4
 import { createClient } from '@/lib/supabase'
 
 // Mapeo detallado de la auditoría según requerimientos

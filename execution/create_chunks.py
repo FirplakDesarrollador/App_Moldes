@@ -1,3 +1,4 @@
+# PV_MOLDES V2.4
 with open('update_moldes_batch.sql', 'r', encoding='utf-8') as f:
     lines = [l.strip() for l in f.readlines() if 'UPDATE' in l]
 

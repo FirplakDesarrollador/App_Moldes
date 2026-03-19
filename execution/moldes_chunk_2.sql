@@ -1,3 +1,4 @@
+-- PV_MOLDES V2.4
 INSERT INTO public.moldes (serial, nombre_articulo, estado, vueltas_actuales, tipo_molde_id) VALUES ('0180-10', 'MOLDE LAVAPLATOS KOA 84X56', 'En uso', 0, (SELECT id FROM public.tipos_moldes WHERE upper(molde_descripcion) = upper('MOLDE LAVAPLATOS KOA 84X56') LIMIT 1)) ON CONFLICT (serial) DO NOTHING;
 INSERT INTO public.moldes (serial, nombre_articulo, estado, vueltas_actuales, tipo_molde_id) VALUES ('0175-35', 'MOLDE LAVAMANOS OSLO 48X43', 'En uso', 0, (SELECT id FROM public.tipos_moldes WHERE upper(molde_descripcion) = upper('MOLDE LAVAMANOS OSLO 48X43') LIMIT 1)) ON CONFLICT (serial) DO NOTHING;
 INSERT INTO public.moldes (serial, nombre_articulo, estado, vueltas_actuales, tipo_molde_id) VALUES ('225-02', 'MOLDE LAVAMANOS DOHA VESSEL 45X33 BRILLANTE', 'En uso', 0, (SELECT id FROM public.tipos_moldes WHERE upper(molde_descripcion) = upper('MOLDE LAVAMANOS DOHA VESSEL 45X33 BRILLANTE') LIMIT 1)) ON CONFLICT (serial) DO NOTHING;

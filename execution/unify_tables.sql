@@ -1,3 +1,4 @@
+-- PV_MOLDES V2.4
 -- RUN THIS IN SUPABASE SQL EDITOR
 
 -- Eliminar si ya existe la tabla o si falló antes y dejó algo a medias:
