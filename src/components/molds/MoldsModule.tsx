@@ -128,76 +128,38 @@ export default function MoldsModule() {
                     <p className="text-gray-500 text-xs font-black uppercase tracking-[0.4em]">Sincronizando Base de Datos...</p>
                 </div>
             ) : filteredMolds.length > 0 ? (
-                <div className="w-full overflow-x-auto rounded-[2rem] border border-black/5 dark:border-white/5 bg-white/50 dark:bg-black/20 shadow-2xl glass-card relative">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="border-b border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02]">
-                                <th className="p-6 text-[10px] font-black uppercase text-gray-500 tracking-widest">Nombre del Molde</th>
-                                <th className="p-6 text-[10px] font-black uppercase text-gray-500 tracking-widest">Serial</th>
-                                <th className="p-6 text-[10px] font-black uppercase text-gray-500 tracking-widest">Estado</th>
-                                <th className="p-6 text-[10px] font-black uppercase text-gray-500 tracking-widest">Tipo Rep.</th>
-                                <th className="p-6 text-[10px] font-black uppercase text-gray-500 tracking-widest min-w-[200px]">Defectos Principales</th>
-                                <th className="p-6 text-[10px] font-black uppercase text-gray-500 tracking-widest">Fecha Ingreso</th>
-                                <th className="p-6 text-[10px] font-black uppercase text-gray-500 tracking-widest">Fecha Esperada</th>
-                                <th className="p-6 text-[10px] font-black uppercase text-gray-500 tracking-widest">Fecha Real Entrega</th>
-                                <th className="p-6 text-center text-[10px] font-black uppercase text-gray-500 tracking-widest">Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                            {filteredMolds.map((mold) => {
-                                const isDelayed = mold.Fecha_esperada && new Date(mold.Fecha_esperada) < new Date() && !((mold.estado || '').toUpperCase().includes('ENTREGADO'));
-                                return (
-                                <tr 
-                                    key={mold.id} 
-                                    onClick={() => setEditingMold(mold)}
-                                    className="group hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors cursor-pointer"
-                                >
-                                    <td className="p-6 align-middle font-bold text-slate-900 dark:text-white uppercase leading-tight">
-                                        {mold.nombre_articulo}
-                                    </td>
-                                    <td className="p-6 align-middle">
-                                        <span className="font-mono text-xs font-bold text-slate-500 uppercase">{mold.serial}</span>
-                                    </td>
-                                    <td className="p-6 align-middle">
-                                        <div className={`inline-flex px-3 py-1.5 rounded-full text-[9px] font-black uppercase border tracking-wider ${getStatusStyles(mold.estado)}`}>
-                                            {mold.estado?.replace(/_/g, ' ')}
-                                        </div>
-                                    </td>
-                                    <td className="p-6 align-middle">
-                                        <div className="bg-black/5 dark:bg-white/5 inline-flex px-3 py-1.5 rounded-full text-[9px] font-bold text-gray-500 uppercase whitespace-nowrap">
-                                            {mold.Tipo_de_reparacion || 'Standard'}
-                                        </div>
-                                    </td>
-                                    <td className="p-6 align-middle">
-                                        <div className="text-xs text-gray-600 dark:text-gray-400 font-medium line-clamp-2 max-w-sm">
-                                            {mold.Observaciones_reparacion || '-'}
-                                        </div>
-                                    </td>
-                                    <td className="p-6 align-middle">
-                                        <div className="font-mono text-xs font-bold text-slate-600 dark:text-gray-400">
-                                            {mold.Fecha_de_ingreso ? mold.Fecha_de_ingreso.split('T')[0] : '-'}
-                                        </div>
-                                    </td>
-                                    <td className="p-6 align-middle">
-                                        <div className={`font-mono text-xs font-bold ${isDelayed ? 'text-red-500' : 'text-slate-600 dark:text-gray-400'}`}>
-                                            {mold.Fecha_esperada ? mold.Fecha_esperada.split('T')[0] : '-'}
-                                        </div>
-                                    </td>
-                                    <td className="p-6 align-middle">
-                                        <div className="font-mono text-xs font-bold text-slate-600 dark:text-gray-400">
-                                            {mold.Fecha_de_entrega ? mold.Fecha_de_entrega.split('T')[0] : '-'}
-                                        </div>
-                                    </td>
-                                    <td className="p-6 align-middle text-center">
-                                        <button className="p-2.5 bg-blue-500/10 hover:bg-blue-500 text-blue-500 hover:text-white rounded-xl transition-all opacity-50 group-hover:opacity-100">
-                                            <Edit3 className="w-4 h-4" />
-                                        </button>
-                                    </td>
-                                </tr>
-                                )
-                            })}
-                        </tbody>
-                    </table>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredMolds.map((mold) => (
+                        <div
+                            key={mold.id || mold.serial || `mold-${mold.nombre_articulo}`}
+                            onClick={() => setEditingMold(mold)}
+                            className="group relative bg-white dark:bg-[#0a0a0a] border border-black/5 dark:border-white/5 rounded-[2.8rem] p-8 hover:border-blue-500/30 transition-all cursor-pointer flex flex-col shadow-[0_10px_40px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_50px_rgba(37,99,235,0.05)]"
+                        >
+                            <div className="flex justify-between items-start mb-6">
+                                <div className="p-4 bg-blue-600/10 rounded-2xl border border-blue-500/20 transition-colors group-hover:bg-blue-600/20">
+                                    <Package className="w-6 h-6 text-blue-500" />
+                                </div>
+                                <div className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors">
+                                    <Edit3 className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                                </div>
+                            </div>
+                            <div className="space-y-4">
+                                <div>
+                                    <h3 className="text-lg font-black text-slate-900 dark:text-white leading-tight uppercase line-clamp-2">{mold.nombre_articulo}</h3>
+                                    <p className="text-[10px] font-mono font-black text-slate-500 dark:text-gray-600 mt-1 uppercase tracking-tighter">SERIAL: {mold.serial}</p>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    <div className={`inline-flex px-4 py-1.5 rounded-full text-[9px] font-black uppercase border tracking-wider transition-all ${getStatusStyles(mold.estado)}`}>
+                                        {mold.estado?.replace(/_/g, ' ')}
+                                    </div>
+                                    <div className="bg-black/5 dark:bg-white/5 px-3 py-1.5 rounded-full text-[9px] font-bold text-gray-500 uppercase">
+                                        {mold.Tipo_de_reparacion || 'Standard'}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="absolute inset-x-0 bottom-0 h-1.5 bg-blue-600 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left rounded-b-[2.8rem]" />
+                        </div>
+                    ))}
                 </div>
             ) : (
                 <div className="py-40 text-center space-y-6 bg-black/5 dark:bg-white/[0.02] rounded-[3rem] border border-dashed border-black/10 dark:border-white/10">

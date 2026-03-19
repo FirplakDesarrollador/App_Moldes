@@ -433,30 +433,16 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
                                         onClick={() => setSelectedDefects(selectedDefects.filter(x => x !== d))}
                                         className="hover:bg-blue-500/20 rounded-full p-0.5"
                                     >
-                                        <X className="w-3 h-3" />
-                                    </button>
-                                </span>
-                            ))}
-                        </div>
-
-                        <div className="relative">
-                            <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            <input
-                                ref={defectInputRef}
-                                type="text"
-                                value={defectSearch}
-                                onChange={e => {
-                                    setDefectSearch(e.target.value)
-                                    setShowDefectDropdown(true)
-                                }}
-                                onFocus={() => setShowDefectDropdown(true)}
-                                placeholder="Buscar o agregar defectos..."
-                                className="w-full bg-black/5 dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-2xl py-5 pl-14 pr-8 font-bold text-slate-900 dark:text-white focus:ring-4 focus:ring-blue-500/20 outline-none transition-all"
-                            />
-                            {showDefectDropdown && (
-                                <div className="absolute top-100 left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-black/10 dark:border-white/10 rounded-2xl shadow-xl z-[60] overflow-hidden max-h-60 overflow-y-auto">
-                                    {unselectedDefects.length > 0 ? (
-                                        unselectedDefects.map(d => (
+                                        <option value="">No Asignado</option>
+                                        {personnel.map((p, idx) => (
+                                            <option key={p.Cedula || p.NombreCompleto || idx} value={p.NombreCompleto}>{p.NombreCompleto}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-4">
+                                    <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Tipo de Reparación</label>
+                                    <div className="flex gap-4">
+                                        {(['Rapida', 'Especial'] as const).map(type => (
                                             <button
                                                 key={d.Título}
                                                 type="button"
@@ -469,21 +455,63 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
                                             >
                                                 <Plus className="w-4 h-4 text-blue-500" /> {d.Título}
                                             </button>
-                                        ))
-                                    ) : (
-                                        defectSearch.trim() && (
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setSelectedDefects([...selectedDefects, defectSearch.trim()])
-                                                    setDefectSearch('')
-                                                }}
-                                                className="w-full text-left px-6 py-4 hover:bg-blue-500/10 text-blue-500 font-bold flex items-center gap-3"
-                                            >
-                                                <Plus className="w-4 h-4" /> Agregar "{defectSearch.trim()}"
-                                            </button>
-                                        )
-                                    )}
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                <div className="space-y-4">
+                                    <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Fecha de Entrada</label>
+                                    <div className="relative">
+                                        <Calendar className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" />
+                                        <input
+                                            type="date"
+                                            value={formData.Fecha_de_ingreso}
+                                            onChange={e => setFormData({ ...formData, Fecha_de_ingreso: e.target.value })}
+                                            className="w-full bg-black/5 dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-2xl py-5 pl-14 pr-6 font-bold text-slate-900 dark:text-white outline-none"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-4 opacity-70">
+                                    <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Fecha Esperada</label>
+                                    <input
+                                        disabled
+                                        type="date"
+                                        value={formData.Fecha_esperada}
+                                        className="w-full bg-black/5 dark:bg-white/[0.01] border border-black/5 dark:border-white/5 rounded-2xl py-5 px-8 font-bold text-gray-500 cursor-not-allowed"
+                                    />
+                                </div>
+                                <div className="space-y-4">
+                                    <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Fecha Real Entrega</label>
+                                    <input
+                                        type="date"
+                                        value={formData.Fecha_de_entrega}
+                                        onChange={e => setFormData({ ...formData, Fecha_de_entrega: e.target.value })}
+                                        className="w-full bg-black/5 dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-2xl py-5 px-8 font-bold text-slate-900 dark:text-white outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-6 pt-4">
+                                <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Defectos a Intervenir</label>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    {defectsCatalog.map((d, idx) => (
+                                        <button
+                                            key={d.id || d.Título || idx}
+                                            type="button"
+                                            onClick={() => {
+                                                const current = selectedDefects.includes(d.Título)
+                                                    ? selectedDefects.filter(x => x !== d.Título)
+                                                    : [...selectedDefects, d.Título]
+                                                setSelectedDefects(current)
+                                                setFormData({ ...formData, Observaciones_reparacion: current.join(', ') })
+                                            }}
+                                            className={`p-4 rounded-2xl border-2 text-[10px] font-black text-left transition-all ${selectedDefects.includes(d.Título) ? 'bg-blue-600 border-blue-600 text-white shadow-xl shadow-blue-600/30' : 'bg-black/5 dark:bg-white/5 border-transparent text-gray-500'}`}
+                                        >
+                                            {d.Título}
+                                        </button>
+                                    ))}
                                 </div>
                             )}
                         </div>
@@ -502,7 +530,7 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
                     </div>
 
                     {isEditing && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-10 border-t border-black/5 dark:border-white/5 bg-blue-500/[0.02] rounded-[3rem] p-10 border border-blue-500/10">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-10 bg-blue-500/[0.02] rounded-[3rem] p-10 border border-blue-500/10 dark:border-white/5">
                             <div className="space-y-4">
                                 <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest ml-1 flex items-center gap-2">
                                     <User className="w-3 h-3" /> Última Modificación Realizada Por
