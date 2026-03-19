@@ -2,7 +2,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { X, Loader2, Save, Calendar, User, Tag, Clock, Package, Search } from 'lucide-react'
+import { X, Loader2, Save, Calendar, User, Tag, Clock, Package, Search, Plus } from 'lucide-react'
 import { moldsService, Mold } from '@/services/molds.service'
 
 interface AddMoldModalProps {
@@ -306,7 +306,23 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
                                                     </button>
                                                 ))
                                             ) : (
-                                                <div className="px-8 py-4 text-xs text-gray-400 font-bold italic">No hay más defectos disponibles</div>
+                                                defectSearch.trim() ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const news = [...selectedDefects, defectSearch.trim()]
+                                                            setSelectedDefects(news)
+                                                            setFormData({ ...formData, Observaciones_reparacion: news.join(', ') })
+                                                            setDefectSearch('')
+                                                            setShowDefectDropdown(false)
+                                                        }}
+                                                        className="w-full text-left px-8 py-4 hover:bg-blue-500/10 text-blue-500 font-bold flex items-center gap-3"
+                                                    >
+                                                        <Plus className="w-4 h-4" /> Agregar "{defectSearch.trim()}"
+                                                    </button>
+                                                ) : (
+                                                    <div className="px-8 py-4 text-xs text-gray-400 font-bold italic">No hay más defectos disponibles</div>
+                                                )
                                             )}
                                         </div>
                                     )}
@@ -328,7 +344,7 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
                     </div>
 
                     {isEditing && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-10 bg-blue-500/[0.02] rounded-[3rem] p-10 border border-blue-500/10 dark:border-white/5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-10 border-t border-black/5 dark:border-white/5 bg-blue-500/[0.02] rounded-[3rem] p-10 border border-blue-500/10">
                             <div className="space-y-4">
                                 <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest ml-1 flex items-center gap-2">
                                     <User className="w-3 h-3" /> Última Modificación Realizada Por
