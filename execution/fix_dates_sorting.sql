@@ -1,3 +1,4 @@
+-- PV_MOLDES V2.4
 -- Convert FECHA ENTRADA strings to DATE type
 -- First, make sure any empty/NULL strings are proper NULL
 UPDATE public.registros_moldes SET 

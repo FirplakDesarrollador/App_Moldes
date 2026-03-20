@@ -1,3 +1,4 @@
+-- PV_MOLDES V2.4
 INSERT INTO public.tipos_moldes (molde_descripcion, planta, molde_sku) VALUES ('MOLDE LAVAPLATOS AMATISTA', 'Marmol_sintetico', 'S/N') ON CONFLICT DO NOTHING;
 INSERT INTO public.tipos_moldes (molde_descripcion, planta, molde_sku) VALUES ('MOLDE LAVAMANOS QUADRATTO 66X51 SIN SALPICADERO', 'Marmol_sintetico', 'S/N') ON CONFLICT DO NOTHING;
 INSERT INTO public.tipos_moldes (molde_descripcion, planta, molde_sku) VALUES ('MOLDE MESON COCINA 151X60', 'Marmol_sintetico', 'S/N') ON CONFLICT DO NOTHING;

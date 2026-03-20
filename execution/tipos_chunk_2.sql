@@ -1,3 +1,4 @@
+-- PV_MOLDES V2.4
 INSERT INTO public.tipos_moldes (molde_descripcion, planta, molde_sku) VALUES ('MODELO LAVAMANOS SIENA 155X48', 'Marmol_sintetico', 'S/N') ON CONFLICT DO NOTHING;
 INSERT INTO public.tipos_moldes (molde_descripcion, planta, molde_sku) VALUES ('MODELO LAVAMANOS GENOVA 155X48', 'Marmol_sintetico', 'S/N') ON CONFLICT DO NOTHING;
 INSERT INTO public.tipos_moldes (molde_descripcion, planta, molde_sku) VALUES ('MODELO LAVAMANOS IGUAZU 40X28', 'Marmol_sintetico', 'S/N') ON CONFLICT DO NOTHING;

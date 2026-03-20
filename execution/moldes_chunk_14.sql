@@ -1,3 +1,4 @@
+-- PV_MOLDES V2.4
 INSERT INTO public.moldes (serial, nombre_articulo, estado, vueltas_actuales, tipo_molde_id) VALUES ('0107-09', 'MOLDE LAVARROPAS ECO 80X60', 'Indefinido', 0, (SELECT id FROM public.tipos_moldes WHERE upper(molde_descripcion) = upper('MOLDE LAVARROPAS ECO 80X60') LIMIT 1)) ON CONFLICT (serial) DO NOTHING;
 INSERT INTO public.moldes (serial, nombre_articulo, estado, vueltas_actuales, tipo_molde_id) VALUES ('00095', 'MOLDE LAVARROPAS ECO 80X60', 'Indefinido', 0, (SELECT id FROM public.tipos_moldes WHERE upper(molde_descripcion) = upper('MOLDE LAVARROPAS ECO 80X60') LIMIT 1)) ON CONFLICT (serial) DO NOTHING;
 INSERT INTO public.moldes (serial, nombre_articulo, estado, vueltas_actuales, tipo_molde_id) VALUES ('0107-02', 'MOLDE LAVARROPAS ECO 80X60', 'Indefinido', 0, (SELECT id FROM public.tipos_moldes WHERE upper(molde_descripcion) = upper('MOLDE LAVARROPAS ECO 80X60') LIMIT 1)) ON CONFLICT (serial) DO NOTHING;

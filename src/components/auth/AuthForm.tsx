@@ -1,3 +1,4 @@
+// PV_MOLDES V2.4
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -155,7 +156,7 @@ export default function AuthForm() {
                     </div>
                     <h1 className="text-xl font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
                         MoldApp
-                        <span className="text-[10px] bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-500/20">V2.3</span>
+                        <span className="text-[10px] bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-500/20">V2.4</span>
                     </h1>
                 </div>
                 <p className="text-gray-500 text-[10px] uppercase tracking-[0.3em] mt-3 font-semibold">Control Interno de Producción</p>

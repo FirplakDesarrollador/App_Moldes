@@ -1,3 +1,4 @@
+-- PV_MOLDES V2.4
 INSERT INTO public.moldes (serial, nombre_articulo, estado, vueltas_actuales, tipo_molde_id) VALUES ('0178-06', 'MOLDE LAVATRAPEROS PRO 46X36', 'En uso', 0, (SELECT id FROM public.tipos_moldes WHERE upper(molde_descripcion) = upper('MOLDE LAVATRAPEROS PRO 46X36') LIMIT 1)) ON CONFLICT (serial) DO NOTHING;
 INSERT INTO public.moldes (serial, nombre_articulo, estado, vueltas_actuales, tipo_molde_id) VALUES ('01149', 'MOLDE LAVARROPAS ECO 80X60', 'En uso', 0, (SELECT id FROM public.tipos_moldes WHERE upper(molde_descripcion) = upper('MOLDE LAVARROPAS ECO 80X60') LIMIT 1)) ON CONFLICT (serial) DO NOTHING;
 INSERT INTO public.moldes (serial, nombre_articulo, estado, vueltas_actuales, tipo_molde_id) VALUES ('0192-17', 'MOLDE LAVAMANOS OSLO 63X48', 'En uso', 0, (SELECT id FROM public.tipos_moldes WHERE upper(molde_descripcion) = upper('MOLDE LAVAMANOS OSLO 63X48') LIMIT 1)) ON CONFLICT (serial) DO NOTHING;

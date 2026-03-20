@@ -1,3 +1,4 @@
+PV_MOLDES V2.4
 # Popular Descripción de Moldes desde Excel
 
 Este proceso permite masificar la actualización de la columna `descripcion_molde` en la tabla `public.moldes` de Supabase.
