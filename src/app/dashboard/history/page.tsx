@@ -44,6 +44,11 @@ export default function RegistroMoldesPage() {
     const [masterMolds, setMasterMolds] = useState<any[]>([])
     const [masterSearch, setMasterSearch] = useState('')
 
+    // Defect Dropdown State
+    const [defectSearch, setDefectSearch] = useState('')
+    const [showDefectDropdown, setShowDefectDropdown] = useState(false)
+    const defectInputRef = useRef<HTMLInputElement>(null)
+
     const searchTimeout = useRef<NodeJS.Timeout | null>(null)
     const observer = useRef<IntersectionObserver | null>(null)
 
@@ -145,7 +150,7 @@ export default function RegistroMoldesPage() {
             return
         }
         try {
-            const results = await moldsService.searchRegistroMoldes(val)
+            const results = await moldsService.searchMoldsMaster(val)
             setMasterMolds(results || [])
         } catch (e) {
             console.error(e)
@@ -158,7 +163,7 @@ export default function RegistroMoldesPage() {
             codigo_molde: m.serial,
             titulo: m.nombre_articulo,
             responsable: m.Responsable || prev.responsable,
-            estado: m.estado || 'En reparación'
+            estado: ['Entregado', 'En reparación', 'Destruido'].includes(m.estado) ? m.estado : 'En reparación'
         }))
         setMasterMolds([])
         setMasterSearch(m.serial)
@@ -239,17 +244,60 @@ export default function RegistroMoldesPage() {
     const handleSave = async () => {
         setIsSaving(true)
         try {
+            // Map app state to SAP expected state
+            let sapEstado = editForm.estado;
+            if (editForm.estado === 'Entregado') sapEstado = 'Activo';
+            if (editForm.estado === 'Destruido') sapEstado = 'Baja';
+
+            // 1. SUPABASE UPDATE
             await moldsService.saveRegistro({
                 ...editForm,
                 usuario: user?.Nombre || user?.NombreCompleto,
                 modified_by: user?.Nombre
             }, isCreateMode)
+
+            // 2. SAP UPDATE
+            // (Only try to update SAP if we have a valid code)
+            let sapSuccess = true;
+            let sapErrorMessage = '';
+            if (editForm.codigo_molde) {
+                try {
+                    const serialSAP = String(editForm.codigo_molde).trim();
+                    console.log("Serial enviado a SAP:", serialSAP);
+                    
+                    const res = await fetch('/api/sap-items/update', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            itemCode: serialSAP,
+                            serialNumber: serialSAP,
+                            estado_sap: sapEstado
+                        })
+                    });
+                    
+                    const sapRes = await res.json();
+                    if (!sapRes.success) {
+                        sapSuccess = false;
+                        sapErrorMessage = sapRes.error;
+                        console.error('SAP Update Failed logic side:', sapRes.error);
+                    }
+                } catch (e) {
+                    sapSuccess = false;
+                    console.error('SAP server error exception:', e);
+                }
+            }
+
+            // 3. RESULT
+            if (sapSuccess) {
+                alert('Registro guardado y estado actualizado en SAP correctamente');
+            } else {
+                alert('Registro guardado, pero falló SAP: ' + (sapErrorMessage || 'No fue posible comunicar con SAP'));
+            }
             
             fetchInitial(searchTerm, filterView)
             setEditingRecord(null)
         } catch (error) {
             console.error(error)
-            alert('Error al guardar el registro')
+            alert('Error al guardar el registro en la base de datos')
         } finally {
             setIsSaving(false)
         }
@@ -267,7 +315,7 @@ export default function RegistroMoldesPage() {
         setIsSearchingMolds(true)
         setShowMoldResults(true)
         try {
-            const results = await moldsService.searchMolds(query)
+            const results = await moldsService.searchRegistroMoldes(query)
             setMoldSearchResults(results || [])
         } catch (error) {
             console.error('Error searching molds:', error)
@@ -480,17 +528,16 @@ export default function RegistroMoldesPage() {
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                 <div className="space-y-4">
                                     <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">Estado del Molde</label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {['Disponible', 'Destruido', 'En uso', 'En reparación'].map((s) => (
-                                            <button
-                                                key={s}
-                                                type="button"
-                                                onClick={() => setEditForm({...editForm, estado: s})}
-                                                className={`px-4 py-3 rounded-xl text-[10px] font-black uppercase border transition-all ${editForm.estado === s ? 'bg-blue-500 text-white border-blue-600 shadow-md shadow-blue-500/20' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-100'}`}
-                                            >
-                                                {s}
-                                            </button>
-                                        ))}
+                                    <div className="grid grid-cols-1 gap-2">
+                                        <select 
+                                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 text-xs font-black uppercase outline-none focus:ring-4 focus:ring-blue-500/5"
+                                            value={editForm.estado || ''}
+                                            onChange={(e) => setEditForm({...editForm, estado: e.target.value})}
+                                        >
+                                            <option value="Entregado">Entregado</option>
+                                            <option value="En reparación">En reparación</option>
+                                            <option value="Destruido">Destruido</option>
+                                        </select>
                                     </div>
                                 </div>
 
@@ -503,7 +550,6 @@ export default function RegistroMoldesPage() {
                                     >
                                         <option value="Reparación rápida">Reparación rápida</option>
                                         <option value="Reparación especial">Reparación especial</option>
-                                        <option value="Otro">Otro</option>
                                     </select>
                                 </div>
 
@@ -542,26 +588,52 @@ export default function RegistroMoldesPage() {
                                     </div>
                                 </div>
 
-                                <div className="flex flex-wrap gap-2">
-                                    {defectsCatalog.map((d, i) => {
-                                        const isSelected = (editForm.defectos_a_reparar || '').includes(d.titulo);
-                                        return (
-                                            <button
-                                                key={i}
-                                                type="button"
-                                                onClick={() => toggleDefect(d.titulo)}
-                                                className={`px-5 py-3 rounded-2xl text-[10px] font-black uppercase transition-all border flex items-center gap-2 ${
-                                                    isSelected 
-                                                        ? 'bg-blue-500 text-white border-blue-600 shadow-lg shadow-blue-500/20' 
-                                                        : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-blue-400'
-                                                }`}
-                                            >
-                                                {d.titulo}
-                                                {d.tiempo > 0 && <span className="text-[9px] opacity-70">({d.tiempo}d)</span>}
-                                            </button>
-                                        )
-                                    })}
-                                    {defectsCatalog.length === 0 && <div className="flex items-center gap-3 p-4 bg-amber-500/5 rounded-2xl border border-amber-500/10"><AlertTriangle className="w-4 h-4 text-amber-500" /><span className="text-[10px] font-bold text-amber-600 uppercase">No se hallaron defectos en la base 'Defectos_moldes'</span></div>}
+                                <div className="space-y-4 relative">
+                                    <div className="flex flex-wrap gap-2 mb-2">
+                                        {(editForm.defectos_a_reparar ? editForm.defectos_a_reparar.split(',').map((x: string) => x.trim()).filter(Boolean) : []).map((d: string) => (
+                                            <span key={d} className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl text-[10px] font-black uppercase">
+                                                {d}
+                                                <button type="button" onClick={() => toggleDefect(d)} className="hover:bg-blue-200 dark:hover:bg-blue-500/20 rounded-full p-0.5"><X className="w-3 h-3" /></button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <div className="relative">
+                                        <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                        <input
+                                            ref={defectInputRef}
+                                            type="text"
+                                            value={defectSearch}
+                                            onChange={e => {
+                                                setDefectSearch(e.target.value)
+                                                setShowDefectDropdown(true)
+                                            }}
+                                            onFocus={() => setShowDefectDropdown(true)}
+                                            placeholder="Buscar o agregar defecto..."
+                                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 pl-14 pr-5 text-xs font-bold outline-none focus:border-blue-500"
+                                        />
+                                        {showDefectDropdown && (
+                                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-[60] overflow-hidden max-h-60 overflow-y-auto">
+                                                {defectsCatalog.filter(d => d.titulo.toLowerCase().includes(defectSearch.toLowerCase()) && !(editForm.defectos_a_reparar || '').includes(d.titulo)).map(d => (
+                                                    <button
+                                                        key={d.titulo}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            toggleDefect(d.titulo)
+                                                            setDefectSearch('')
+                                                            setShowDefectDropdown(false)
+                                                        }}
+                                                        className="w-full text-left px-6 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 font-bold text-[10px] uppercase border-b border-slate-50 dark:border-slate-800 last:border-0 flex justify-between"
+                                                    >
+                                                        <span>{d.titulo}</span>
+                                                        <span className="text-slate-400">+{d.tiempo || 0}d</span>
+                                                    </button>
+                                                ))}
+                                                {defectsCatalog.filter(d => d.titulo.toLowerCase().includes(defectSearch.toLowerCase()) && !(editForm.defectos_a_reparar || '').includes(d.titulo)).length === 0 && (
+                                                    <div className="px-6 py-4 text-[10px] uppercase font-bold text-slate-400">No hay coincidencias</div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -219,11 +219,15 @@ export const moldsService = {
             "Tipo": record.tipo,
             "Modified": new Date().toISOString(),
             "Modified By": record.usuario || record.modified_by
-        }
+        } as any;
+        
+        // Let's NOT attach ESTADO MOLDE directly to BD_moldes because the column doesn't exist and crashes Supabase (PGRST204)
+        // You must manually create the column "ESTADO MOLDE" in Supabase if you want BD_moldes to store it permanently locally.
+        // dbRecord["ESTADO MOLDE"] = record.estado_molde;
 
         if (isNew) {
-            // Include IDs for new records if provided/managed
-            (dbRecord as any).id = record.id;
+            // Include IDs for new records if provided/managed, otherwise generate a bigint timestamp id
+            (dbRecord as any).id = (!record.id || record.id === 'NEW') ? Date.now() : record.id;
             (dbRecord as any)["Created"] = new Date().toISOString();
             (dbRecord as any)["Created By"] = record.usuario;
 

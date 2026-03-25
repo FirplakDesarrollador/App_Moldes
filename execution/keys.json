@@ -1,0 +1,20 @@
+[
+  "DocEntry",
+  "ItemCode",
+  "ItemDescription",
+  "MfrSerialNo",
+  "SerialNumber",
+  "LotNumber",
+  "SystemNumber",
+  "AdmissionDate",
+  "ManufacturingDate",
+  "ExpirationDate",
+  "MfrWarrantyStart",
+  "MFrWarrantyEnd",
+  "Location",
+  "Details",
+  "U_EstadoMolde",
+  "U_PorcUtilizacion",
+  "U_NumVueltas",
+  "U_CodColor"
+]
