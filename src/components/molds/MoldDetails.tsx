@@ -3,13 +3,13 @@
 
 import { useState, useEffect } from 'react'
 import { X, Calendar, User, Tag, Info, Ruler, AlertCircle, Clock, Edit3, Loader2, Package, CheckCircle2, Activity } from 'lucide-react'
-import { Mold, moldsService } from '@/services/molds.service'
+import { MoldActive, moldsService } from '@/services/molds.service'
 import { parseFlexibleDate } from '@/lib/date-utils'
 
 interface MoldDetailsProps {
-    mold: Mold
+    mold: MoldActive
     onClose: () => void
-    onEdit: (mold: Mold) => void
+    onEdit: (mold: MoldActive) => void
 }
 
 export default function MoldDetails({ mold, onClose, onEdit }: MoldDetailsProps) {
@@ -23,7 +23,7 @@ export default function MoldDetails({ mold, onClose, onEdit }: MoldDetailsProps)
     const loadRepairCount = async () => {
         setLoadingCount(true)
         try {
-            const count = await moldsService.getCountByReference(mold.Nombre)
+            const count = await moldsService.getCountByReference(mold.Nombre || '')
             setRepairCount(count)
         } catch (error) {
             console.error(error)

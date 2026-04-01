@@ -7,6 +7,7 @@ export interface Mold {
     serial: string
     nombre_articulo: string
     estado: string
+    Estado_reparacion?: string
     Responsable?: string
     Tipo_de_reparacion?: string
     Fecha_de_ingreso?: string
@@ -15,8 +16,29 @@ export interface Mold {
     vueltas_actuales?: number
     vueltas_acumuladas?: number
     observaciones?: string
+    Observaciones_reparacion?: string
     modificado_por?: string
     modified_at?: string
+    Nombre?: string
+}
+
+export interface MoldActive {
+    id: number
+    ID?: number
+    Título: string
+    Nombre?: string
+    "CODIGO MOLDE": string
+    Prioridad?: string
+    ESTADO: string
+    "FECHA ENTRADA"?: string
+    "FECHA ESPERADA"?: string
+    "FECHA ENTREGA"?: string
+    "DEFECTOS A REPARAR"?: string
+    OBSERVACIONES?: string
+    Usuario?: string
+    "Tipo de reparacion"?: string
+    Created?: string
+    Modified?: string
 }
 
 export const moldsService = {
@@ -340,6 +362,33 @@ export const moldsService = {
             .order('nombreCompleto', { ascending: true })
         if (error) return []
         return data || []
+    },
+
+    async updateStatus(mold: MoldActive, newStatus: string, user: string) {
+        const supabase = createClient()
+        const { error } = await supabase
+            .from('BD_moldes')
+            .update({ 
+                ESTADO: newStatus,
+                Modified: new Date().toISOString(),
+                "Modified By": user
+            })
+            .eq('id', mold.id)
+        
+        if (error) throw error
+        return true
+    },
+
+    async getCountByReference(name: string) {
+        if (!name) return 0
+        const supabase = createClient()
+        const { count, error } = await supabase
+            .from('BD_moldes')
+            .select('*', { count: 'exact', head: true })
+            .ilike('Título', name)
+        
+        if (error) return 0
+        return count || 0
     },
 
     // Raw Materials Methods
