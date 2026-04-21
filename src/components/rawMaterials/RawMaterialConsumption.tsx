@@ -43,7 +43,8 @@ export default function RawMaterialConsumption() {
         mp_molde_codigo: '--',
         concepto: '',
         observaciones: '',
-        relacion_molde: '' // Added for mould relation
+        relacion_molde: '', // Code
+        relacion_molde_nombre: '' // Name
     })
 
     const [moldsSearchResults, setMoldsSearchResults] = useState<any[]>([])
@@ -110,9 +111,8 @@ export default function RawMaterialConsumption() {
             const now = new Date().toISOString()
             const usuarioStr = user?.Nombre || user?.NombreCompleto || 'Desconocido'
 
-            // Prepare record for public."Entradas_salidas_MP"
-            const finalRecord = {
-                // id is auto-generated
+            // prepare record for public."Entradas_salidas_MP" (Existing table)
+            const oldTableRecord = {
                 'Título': formData.titulo,
                 'CODIGO MP': formData.codigo_mp,
                 'CANTIDAD': formData.cantidad,
@@ -124,15 +124,36 @@ export default function RawMaterialConsumption() {
                 'OBSERVACIONES': formData.observaciones,
                 'Created': now,
                 'Usuario': usuarioStr,
-                'SAP': 'Pendiente', // SAP sync field
+                'SAP': 'Pendiente',
                 'Modified': now,
                 'Modified By': usuarioStr,
                 'MOLDE RELACIONADO': formData.relacion_molde
             }
 
-            await moldsService.saveRawMaterialMovement(finalRecord)
+            // prepare record for public."historico_BD_entradas _salidas_MP" (REQUIRED NEW TABLE)
+            const historicoRecord = {
+                materia_prima: formData.titulo,
+                codigo_materia_prima: formData.codigo_mp,
+                uab: formData.unds,
+                unidades: parseFloat(formData.cantidad),
+                tipo_movimiento: formData.tipo,
+                concepto: formData.concepto,
+                molde: formData.relacion_molde_nombre,
+                codigo_molde: formData.relacion_molde,
+                responsable: usuarioStr,
+                fecha_movimiento: now,
+                observaciones: formData.observaciones,
+                mp_molde: formData.mp_molde,
+                mp_molde_codigo: formData.mp_molde_codigo
+            }
 
-            setMessage({ type: 'success', text: 'Movimiento registrado correctamente en Entradas_salidas_MP.' })
+            // Save to both
+            await Promise.all([
+                moldsService.saveRawMaterialMovement(oldTableRecord),
+                moldsService.saveHistoricoMP(historicoRecord)
+            ])
+
+            setMessage({ type: 'success', text: 'Movimiento registrado correctamente en historial y base de datos.' })
             
             // Clear form
             setFormData({
@@ -146,8 +167,10 @@ export default function RawMaterialConsumption() {
                 mp_molde_codigo: '--',
                 concepto: '',
                 observaciones: '',
-                relacion_molde: ''
+                relacion_molde: '',
+                relacion_molde_nombre: ''
             })
+            setMoldSearchTerm('')
         } catch (error: any) {
             console.error(error)
             setMessage({ type: 'error', text: 'Fallo técnica: ' + (error.message || 'Error desconocido') })
@@ -176,8 +199,12 @@ export default function RawMaterialConsumption() {
     }
 
     const selectMold = (m: any) => {
-        setFormData(prev => ({ ...prev, relacion_molde: m.serial }))
-        setMoldSearchTerm(m.serial)
+        setFormData(prev => ({ 
+            ...prev, 
+            relacion_molde: m.serial,
+            relacion_molde_nombre: m.nombre_articulo 
+        }))
+        setMoldSearchTerm(`${m.serial} - ${m.nombre_articulo}`)
         setShowMoldResults(false)
     }
 
@@ -396,7 +423,7 @@ export default function RawMaterialConsumption() {
                             disabled={saving}
                             className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white font-black py-8 rounded-[2.8rem] transition-all shadow-2xl shadow-emerald-500/30 flex items-center justify-center gap-6 uppercase tracking-[0.3em] text-[11px] active:scale-[0.98]"
                         >
-                            {saving ? <Loader2 className="w-8 h-8 animate-spin" /> : <><Save className="w-8 h-8" /> Confirmar & Registrar Movimiento</>}
+                            {saving ? <Loader2 className="w-8 h-8 animate-spin" /> : <><Save className="w-8 h-8" /> Confirmar y registrar movimiento</>}
                         </button>
                     </div>
                     

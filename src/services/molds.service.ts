@@ -224,29 +224,22 @@ export const moldsService = {
             query = query.or(`"CODIGO MOLDE".ilike.${term},"Título".ilike.${term},"DEFECTOS A REPARAR".ilike.${term},"ESTADO".ilike.${term}`)
         }
 
-        // 2.3 logic: ONLY show active reparative states, EXCLUDE Destruido/Entregado
-        // Including non-accented variants and common variants to match real data (e.g. 'En espera - Produccion')
-        query = query.in('ESTADO', [
-            'En espera en moldes', 'EN ESPERA EN MOLDES', 'En espera moldes', 'En espera - Moldes',
-            'En reparación', 'En reparacion', 'EN REPARACIÓN', 'EN REPARACION',
-            'En espera en producción', 'En espera en produccion', 'EN ESPERA EN PRODUCCIÓN',
-            'En espera producción', 'En espera produccion', 'En espera - Producción', 'En espera - Produccion'
-        ])
+        // 2.3 logic: ONLY show active reparative states, EXCLUDE finished states (Entregado, Destruido, etc.)
+        // We exclude common "finished" statuses to show everything else in Registro Moldes
+        const finishedStates = ['Entregado', 'Destruido', 'Baja', 'Activo', 'ENREGADO', 'DESTRUIDO', 'ENTREGADO', 'BAJA', 'ACTIVO'];
+        query = query.not('ESTADO', 'in', `(${finishedStates.map(s => `"${s}"`).join(',')})`)
 
         if (filters?.repair_type && filters.repair_type !== 'Todos') {
             const rt = filters.repair_type.toLowerCase();
-            if (rt === 'reparaciones') {
-                // General repairs view
-                query = query.or(`"ESTADO".ilike.%reparacion%,"Tipo de reparacion".ilike.%reparacion%,"Tipo de reparacion".ilike.%rapida%,"Tipo de reparacion".ilike.%especial%`)
-            } else if (rt.includes('rapida') || rt.includes('rápida')) {
-                // Specific: Rapida
-                query = query.ilike('Tipo de reparacion', '%rapida%')
+            if (rt.includes('rapida') || rt.includes('rápida')) {
+                // Specific: Rapida variants
+                query = query.or('"Tipo de reparacion".ilike.%rapida%,"Tipo de reparacion".ilike.%rápida%')
             } else if (rt.includes('especial')) {
-                // Specific: Especial
-                query = query.ilike('Tipo de reparacion', '%especial%')
+                // Specific: Especial variants
+                query = query.or('"Tipo de reparacion".ilike.%especial%,"Tipo de reparacion".ilike.%Especial%')
             } else {
-                // Other exact matches
-                query = query.eq('Tipo de reparacion', filters.repair_type)
+                // General flexible search for other types
+                query = query.ilike('Tipo de reparacion', `%${filters.repair_type}%`)
             }
         }
 
@@ -332,7 +325,31 @@ export const moldsService = {
             saved = data?.[0]
         }
 
-        // 2. Synchronize with MASTER 'moldes' table
+        // 2. Dual persistence: base_datos_historico_moldes (History Sync)
+        // We map the record to the historical table schema (snake_case)
+        const historicoRecord = {
+            id: saved?.id || record.id,
+            titulo: record.titulo,
+            codigo_molde: record.codigo_molde,
+            defectos_a_reparar: record.defectos_a_reparar,
+            fecha_entrada: record.fecha_entrada,
+            fecha_esperada: record.fecha_esperada,
+            fecha_entrega: record.fecha_entrega,
+            estado: record.estado,
+            observaciones: record.observaciones,
+            usuario: record.usuario,
+            recibido: record.recibido,
+            created: isNew ? new Date().toISOString().split('T')[0] : (record.created || new Date().toISOString().split('T')[0]),
+            responsable: record.responsable,
+            tipo_de_reparacion: record.tipo_de_reparacion,
+            tipo: record.tipo
+        }
+
+        await supabase
+            .from('base_datos_historico_moldes')
+            .upsert(historicoRecord, { onConflict: 'id' })
+
+        // 3. Synchronize with MASTER 'moldes' table
         const masterUpdate = {
             estado: record.estado,
             Responsable: record.responsable,
@@ -427,6 +444,21 @@ export const moldsService = {
             
         if (error) {
             console.error('Error saving to Entradas_salidas_MP:', error.message)
+            throw error
+        }
+        return data?.[0]
+    },
+
+    async saveHistoricoMP(record: any) {
+        const supabase = createClient()
+        // Target table: public."historico_BD_entradas _salidas_MP"
+        const { data, error } = await supabase
+            .from('historico_BD_entradas _salidas_MP')
+            .insert([record])
+            .select()
+
+        if (error) {
+            console.error('Error saving to historico_BD_entradas _salidas_MP:', error.message)
             throw error
         }
         return data?.[0]

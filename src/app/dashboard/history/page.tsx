@@ -405,7 +405,7 @@ export default function RegistroMoldesPage() {
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
                     
                     {/* Header & Main Controls */}
-                    <div className="bg-white dark:bg-slate-900/50 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl p-8 lg:p-12 relative overflow-hidden">
+                    <div className="bg-white dark:bg-slate-900/50 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl p-8 lg:p-12 relative overflow-visible z-20">
                         <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8">
                             <div className="space-y-2">
                                 <h1 className="text-4xl font-black tracking-tighter uppercase text-slate-900 dark:text-white">Registro <span className="text-blue-500">moldes</span></h1>
@@ -467,25 +467,25 @@ export default function RegistroMoldesPage() {
                             <table className="w-full text-left border-collapse min-w-[1100px]">
                                 <thead>
                                     <tr className="bg-slate-50/50 dark:bg-slate-950/20 border-b border-slate-100 dark:border-slate-800">
-                                        <th className="py-6 px-10 text-[10px] font-black text-slate-400 uppercase tracking-widest">Código / Título</th>
-                                        <th className="py-6 px-10 text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado</th>
-                                        <th className="py-6 px-10 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Tipo Reparación</th>
-                                        <th className="py-6 px-10 text-[10px] font-black text-slate-400 uppercase tracking-widest">Defectos & Notas</th>
-                                        <th className="py-6 px-10 text-[10px] font-black text-slate-400 uppercase tracking-widest">Cronología</th>
-                                        <th className="py-6 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest sticky right-0 bg-slate-50/90 dark:bg-slate-950/90 backdrop-blur z-10 text-center border-l border-slate-100 dark:border-slate-800 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] shadow-slate-200/50 dark:shadow-slate-900/50">Acciones</th>
+                                        <th className="py-4 px-5 text-[10px] font-black text-slate-400 uppercase tracking-widest w-[20%]">Código / Título</th>
+                                        <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-[10%]">Estado</th>
+                                        <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-[12%]">Tipo Reparación</th>
+                                        <th className="py-4 px-5 text-[10px] font-black text-slate-400 uppercase tracking-widest w-[38%]">Defectos & Notas</th>
+                                        <th className="py-4 px-5 text-[10px] font-black text-slate-400 uppercase tracking-widest w-[14%]">Cronología</th>
+                                        <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest sticky right-0 bg-slate-50/90 dark:bg-slate-950/90 backdrop-blur z-10 text-center border-l border-slate-100 dark:border-slate-800 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] shadow-slate-200/50 dark:shadow-slate-900/50 w-[6%]">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 relative">
                                     {records.map((r, i) => (
                                         <tr key={`${r.id}-${i}`} ref={i === records.length - 1 ? lastElementRef : null} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-all group">
-                                            <td className="py-8 px-10">
-                                                <div className="space-y-1">
+                                            <td className="py-5 px-5">
+                                                <div className="space-y-0.5">
                                                     <div className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">{r.codigo_molde || 'S/C'}</div>
-                                                    <div className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[250px]">{r.titulo || 'Sin Título'}</div>
+                                                    <div className="text-[10px] font-bold text-slate-400 uppercase line-clamp-1">{r.titulo || 'Sin Título'}</div>
                                                 </div>
                                             </td>
-                                            <td className="py-8 px-10">
-                                                <span className={`px-4 py-2 rounded-xl text-[9px] font-black border uppercase tracking-widest ${
+                                            <td className="py-5 px-4">
+                                                <span className={`px-2.5 py-1 rounded-lg text-[8px] font-black border uppercase tracking-wider whitespace-nowrap ${
                                                     (r.estado || '').includes('reparacion') || (r.estado || '') === 'En reparación' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 
                                                     (r.estado || '').includes('Entregado') || (r.estado || '') === 'Activo' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
                                                     (r.estado || '').includes('Destruido') || (r.estado || '') === 'Baja' ? 'bg-red-500/10 text-red-600 border-red-500/20' :
@@ -494,29 +494,29 @@ export default function RegistroMoldesPage() {
                                                     {r.estado || 'Sin Estado'}
                                                 </span>
                                             </td>
-                                            <td className="py-8 px-10 text-center">
-                                                <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-full text-[9px] font-black uppercase text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                            <td className="py-5 px-4 text-center">
+                                                <div className="inline-flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-[8px] font-black uppercase text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 whitespace-nowrap">
                                                     {r.tipo_de_reparacion || 'N/A'}
                                                 </div>
                                             </td>
-                                            <td className="py-8 px-10 max-w-[350px]">
-                                                <div className="space-y-1.5">
-                                                    <p className="text-xs font-bold text-red-500 leading-relaxed truncate">{r.defectos_a_reparar || '--'}</p>
-                                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 italic truncate opacity-70">{r.observaciones}</p>
+                                            <td className="py-5 px-5 whitespace-normal">
+                                                <div className="space-y-1 max-w-full">
+                                                    <p className="text-xs font-bold text-red-500 leading-tight line-clamp-2 uppercase italic">{r.defectos_a_reparar || '--'}</p>
+                                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 italic line-clamp-1 opacity-70 leading-tight">{r.observaciones}</p>
                                                 </div>
                                             </td>
-                                            <td className="py-8 px-10">
-                                                <div className="flex flex-col gap-1 min-w-[100px]">
-                                                    <div className="flex items-center gap-2 text-[10px] font-black text-slate-600 dark:text-slate-300">
-                                                        <Calendar className="w-3 h-3 text-blue-500" />
+                                            <td className="py-5 px-5">
+                                                <div className="flex flex-col gap-0.5">
+                                                    <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-600 dark:text-slate-300">
+                                                        <Calendar className="w-3 h-3 text-blue-500 opacity-70" />
                                                         {r.fecha_entrada ? r.fecha_entrada : 'S/F'}
                                                     </div>
-                                                    <div className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Vence: {r.fecha_esperada || '---'}</div>
+                                                    <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Vence: {r.fecha_esperada || '---'}</div>
                                                 </div>
                                             </td>
-                                            <td className="py-8 px-6 sticky right-0 bg-white dark:bg-slate-900 group-hover:bg-slate-50/50 dark:group-hover:bg-slate-800/80 transition-all border-l border-slate-100 dark:border-slate-800 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] shadow-slate-200/50 dark:shadow-slate-900/50 z-10 text-center align-middle">
-                                                <button onClick={() => handleEditClick(r)} className="p-3.5 bg-slate-100 dark:bg-slate-800 rounded-2xl hover:bg-blue-500 hover:text-white transition-all border border-slate-200 dark:border-slate-700 mx-auto flex shrink-0 group/btn">
-                                                    <Edit2 className="w-4 h-4 text-slate-500 group-hover/btn:text-white dark:text-slate-400" />
+                                            <td className="py-5 px-4 sticky right-0 bg-white dark:bg-slate-900 group-hover:bg-slate-50/50 dark:group-hover:bg-slate-800/80 transition-all border-l border-slate-100 dark:border-slate-800 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] shadow-slate-200/50 dark:shadow-slate-900/50 z-10 text-center align-middle">
+                                                <button onClick={() => handleEditClick(r)} className="p-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-blue-500 hover:text-white transition-all border border-slate-200 dark:border-slate-700 mx-auto flex shrink-0 group/btn shadow-sm">
+                                                    <Edit2 className="w-3.5 h-3.5 text-slate-500 group-hover/btn:text-white dark:text-slate-400" />
                                                 </button>
                                             </td>
                                         </tr>
