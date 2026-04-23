@@ -45,10 +45,9 @@ export interface RapidaKPIResult {
     totalMoldesReparados: number   // weighted: MS+FV + brillados*0.5 + desmanchados*0.333
     countMS: number
     countFV: number
-    countBrillado: number          // raw count
     countDesmanchado: number       // raw count
     moldesEsperados: number        // FECHA ESPERADA in range
-    moldesEntregados: number       // FECHA ENTREGA in range AND FECHA ESPERADA in range
+    moldesEntregados: number       // FECHA ENTREGA in range AND FECHA ESPERADA <= range end
     metaTotal: number              // 24 × numDays
     metaPorPersona: number         // fixed 3.4
     totalOperarios: number         // sum of daily operators
@@ -102,11 +101,10 @@ export function getDatesInRange(start: string, end: string): string[] {
 }
 
 /** Detect brillado/desmanchado from defectos string */
-function classifyDefecto(defectos: string | null): { brillado: boolean; desmanchado: boolean } {
+function classifyDefecto(defectos: string | null): { desmanchado: boolean } {
     const d = (defectos || '').toLowerCase()
     return {
-        brillado:    d.includes('brillado'),
-        desmanchado: d.includes('desmanchado'),
+        desmanchado: d.includes('desmanch'),
     }
 }
 
@@ -207,28 +205,29 @@ export const indicatorsService = {
             }
         }
 
-        // ── Moldes Reparados = FECHA ENTREGA in range ─────────────────────────
+        // ── Moldes Reparados: Todo lo entregado en el rango (Productividad) ──
         const reparadosEnRangoRaw = rows.filter((r: any) => {
             const fe = r['FECHA ENTREGA']
+            // Solo importa que la fecha de entrega real esté en el rango
             return fe && fe >= dateRange.start && fe <= dateRange.end
         })
 
         let countMS = 0
         let countFV = 0
-        let countBrillado = 0
         let countDesmanchado = 0
         let weightedTotal = 0
         const reparadosFormatted: any[] = []
 
         for (const r of reparadosEnRangoRaw) {
-            const { brillado, desmanchado } = classifyDefecto(r['DEFECTOS A REPARAR'])
+            const defectStr = (r['DEFECTOS A REPARAR'] || '').toLowerCase()
+            
+            // Si es un brillado, se ignora completamente según instrucción
+            if (defectStr.includes('brill')) continue;
+
+            const { desmanchado } = classifyDefecto(r['DEFECTOS A REPARAR'])
             let tipoCalculado = 'Otros'
 
-            if (brillado) {
-                countBrillado++
-                weightedTotal += 0.5
-                tipoCalculado = 'Brillado'
-            } else if (desmanchado) {
+            if (desmanchado) {
                 countDesmanchado++
                 weightedTotal += 1 / 3
                 tipoCalculado = 'Desmanchado'
@@ -271,14 +270,13 @@ export const indicatorsService = {
             return fes && fes >= dateRange.start && fes <= dateRange.end
         }).length
 
-        // ── Moldes Entregados: FECHA ENTREGA in range AND FECHA ESPERADA in range ─
+        // ── Moldes Entregados: Comprometidos para este periodo Y ya entregados ──
         const moldesEntregados = rows.filter((r: any) => {
             const fe  = r['FECHA ENTREGA']
             const fes = r['FECHA ESPERADA']
-            return (
-                fe  && fe  >= dateRange.start && fe  <= dateRange.end &&
-                fes && fes >= dateRange.start && fes <= dateRange.end
-            )
+            if (!fe || !fes) return false
+
+            return (fes >= dateRange.start && fes <= dateRange.end && fe <= dateRange.end)
         }).length
 
         // ── KPIs ──────────────────────────────────────────────────────────────
@@ -288,7 +286,7 @@ export const indicatorsService = {
 
         return {
             totalMoldesReparados,
-            countMS, countFV, countBrillado, countDesmanchado,
+            countMS, countFV, countDesmanchado,
             moldesEsperados, moldesEntregados,
             metaTotal, metaPorPersona, totalOperarios, numDays,
             productividad, nivelServicio, productividadHH,

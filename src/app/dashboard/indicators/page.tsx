@@ -335,7 +335,7 @@ export default function IndicatorsPage() {
                             <div className="space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                                     {[
-                                        { label: 'Productividad', value: (rapidaResult.productividad * 100).toFixed(1) + '%', sub: `${rapidaResult.totalMoldesReparados.toFixed(2)} rep. / ${rapidaResult.metaTotal} meta`, icon: Activity, color: rapidaGaugeColor(rapidaResult.productividad) },
+                                        { label: 'Productividad', value: (rapidaResult.productividad * 100).toFixed(1) + '%', sub: `${Math.round(rapidaResult.totalMoldesReparados)} rep. / ${rapidaResult.metaTotal} meta`, icon: Activity, color: rapidaGaugeColor(rapidaResult.productividad) },
                                         { label: 'Nivel de Servicio', value: (rapidaResult.nivelServicio * 100).toFixed(1) + '%', sub: `${rapidaResult.moldesEntregados} entr. / ${rapidaResult.moldesEsperados} esp.`, icon: TrendingUp, color: rapidaGaugeColor(rapidaResult.nivelServicio) },
                                         { label: 'Prod. Hora Hombre', value: rapidaResult.totalOperarios > 0 ? rapidaResult.productividadHH.toFixed(2) : '—', sub: `Meta: 3.4`, icon: Gauge, color: rapidaResult.productividadHH >= 3.4 ? {text: 'text-green-500'} : {text: 'text-amber-500'} },
                                     ].map(g => (
@@ -348,7 +348,7 @@ export default function IndicatorsPage() {
                                 </div>
 
                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-                                    <RapidaCard label="Total Moldes Reparados" value={rapidaResult.totalMoldesReparados.toFixed(2)} sub="Ponderado (Clic ver)" icon={<Package />} colorClass="text-amber-600" bgClass="bg-amber-50 dark:bg-amber-900/20 border-amber-200" onClick={() => setShowRapidaModal(true)} />
+                                    <RapidaCard label="Total Moldes Reparados" value={Math.round(rapidaResult.totalMoldesReparados).toString()} sub="Ponderado (Clic ver)" icon={<Package />} colorClass="text-amber-600" bgClass="bg-amber-50 dark:bg-amber-900/20 border-amber-200" onClick={() => setShowRapidaModal(true)} />
                                     <RapidaCard label="Moldes Esperados" value={String(rapidaResult.moldesEsperados)} sub="F. ESPERADA en rango" icon={<CalendarDays />} colorClass="text-blue-600" bgClass="bg-blue-50" />
                                     <RapidaCard label="Moldes Entregados" value={String(rapidaResult.moldesEntregados)} sub="En período comprometido" icon={<CheckCircle2 />} colorClass="text-green-600" bgClass="bg-green-50" />
                                     <RapidaCard label="Meta Total" value={String(rapidaResult.metaTotal)} sub={`24 × ${rapidaResult.numDays} días`} icon={<Target />} colorClass="text-slate-600" bgClass="bg-slate-50" />
@@ -362,7 +362,6 @@ export default function IndicatorsPage() {
                                         {[
                                             { label: 'MS (Mármol Sint.)', value: rapidaResult.countMS, weight: '×1', color: 'text-emerald-600', bg: 'bg-emerald-50' },
                                             { label: 'FV (Fibra Vidrio)', value: rapidaResult.countFV, weight: '×1', color: 'text-sky-600', bg: 'bg-sky-50' },
-                                            { label: 'Brillados', value: rapidaResult.countBrillado, weight: '×0.5', color: 'text-yellow-600', bg: 'bg-yellow-50' },
                                             { label: 'Desmanchados', value: rapidaResult.countDesmanchado, weight: '×⅓', color: 'text-orange-600', bg: 'bg-orange-50' },
                                         ].map(item => (
                                             <div key={item.label} className={`rounded-2xl p-4 border border-slate-100 dark:border-slate-800 ${item.bg} space-y-1`}>
@@ -443,7 +442,7 @@ export default function IndicatorsPage() {
                             <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                                 <h3 className="text-sm font-black flex items-center gap-3"><BarChart3 className="w-5 h-5 text-amber-500" /> Detalle de Moldes Reparados <span className="px-3 py-1 text-[9px] font-black uppercase rounded-full border border-amber-200 text-amber-600 bg-amber-50">REPARACIÓN RÁPIDA</span></h3>
                                 <div className="flex items-center gap-4">
-                                    <span className="text-[9px] font-black text-slate-400 uppercase">Ponderado: {rapidaResult.totalMoldesReparados.toFixed(2)}</span>
+                                    <span className="text-[9px] font-black text-slate-400 uppercase">Ponderado: {Math.round(rapidaResult.totalMoldesReparados)}</span>
                                     <button onClick={() => setShowRapidaModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X className="w-5 h-5 text-slate-400" /></button>
                                 </div>
                             </div>
