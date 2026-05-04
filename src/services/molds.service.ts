@@ -550,6 +550,7 @@ export const moldsService = {
 
         // 3. HISTÓRICO: SIEMPRE INSERT (es un log completo de cambios)
         const historicoRecord = {
+            id: Date.now() + 10, // ID único manual para histórico
             titulo: record.titulo,
             codigo_molde: codigoMolde,
             defectos_a_reparar: record.defectos_a_reparar,
