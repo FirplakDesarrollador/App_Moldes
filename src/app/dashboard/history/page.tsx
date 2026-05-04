@@ -50,20 +50,21 @@ export default function RegistroMoldesPage() {
     const [showDefectDropdown, setShowDefectDropdown] = useState(false)
     const defectInputRef = useRef<HTMLInputElement>(null)
 
-    // Global Search with Autocomplete
-    const [globalMoldsResults, setGlobalMoldsResults] = useState<any[]>([])
-    const [isSearchingGlobal, setIsSearchingGlobal] = useState(false)
-    const [showGlobalResults, setShowGlobalResults] = useState(false)
+    // Main Search Suggestions (BD_moldes)
+    const [searchSuggestions, setSearchSuggestions] = useState<any[]>([])
+    const [isSearchingSuggestions, setIsSearchingSuggestions] = useState(false)
+    const [showSuggestions, setShowSuggestions] = useState(false)
+    const suggestionsRef = useRef<HTMLDivElement>(null)
 
     const searchTimeout = useRef<NodeJS.Timeout | null>(null)
     const observer = useRef<IntersectionObserver | null>(null)
-    const globalResultsRef = useRef<HTMLDivElement>(null)
 
-    // Close global results on escape or click outside
+
+    // Close suggestions on click outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (globalResultsRef.current && !globalResultsRef.current.contains(event.target as Node)) {
-                setShowGlobalResults(false)
+            if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
+                setShowSuggestions(false)
             }
         }
         document.addEventListener("mousedown", handleClickOutside)
@@ -149,8 +150,35 @@ export default function RegistroMoldesPage() {
         fetchInitial(searchTerm, filterView)
     }, [searchTerm, filterView])
 
+    // Main List Search (BD_moldes)
+    const handleMainSearchChange = async (val: string) => {
+        setSearchTerm(val)
+        if (val.length < 2) {
+            setSearchSuggestions([])
+            setShowSuggestions(false)
+            return
+        }
+
+        setIsSearchingSuggestions(true)
+        setShowSuggestions(true)
+        try {
+            const results = await moldsService.searchMoldsInBD(val)
+            setSearchSuggestions(results || [])
+        } catch (e) {
+            console.error(e)
+        } finally {
+            setIsSearchingSuggestions(false)
+        }
+    }
+
+    const selectSuggestion = (s: any) => {
+        setSearchTerm(s.serial)
+        setShowSuggestions(false)
+        fetchInitial(s.serial, filterView)
+    }
+
     // Modal search (within Nuevo registro): must use BD_moldes
-    const handleMasterSearch = async (val: string) => {
+    async function handleMasterSearch(val: string) {
         setMasterSearch(val)
         if (val.length < 2) {
             setMasterMolds([])
@@ -165,42 +193,22 @@ export default function RegistroMoldesPage() {
         }
     }
 
-    // Global search (header): must use moldes table
-    const handleGlobalSearchChange = async (val: string) => {
-        setSearchTerm(val)
-        if (val.length < 2) {
-            setGlobalMoldsResults([])
-            setShowGlobalResults(false)
-            return
-        }
-        setIsSearchingGlobal(true)
-        setShowGlobalResults(true)
-        try {
-            // Requirement 2.2: Global search must connect to moldes table
-            const results = await moldsService.searchMoldsMaster(val)
-            setGlobalMoldsResults(results || [])
-        } catch (e) {
-            console.error(e)
-        } finally {
-            setIsSearchingGlobal(false)
-        }
-    }
-
-    const selectGlobalMold = (m: any) => {
-        setSearchTerm(m.serial)
-        setShowGlobalResults(false)
-        setGlobalMoldsResults([]) // Clear result to hide box
-        // Optionally jump to it by filtering exactly
-        fetchInitial(m.serial, filterView)
-    }
 
     const selectMasterMoldFromBD = (m: any) => {
+        // m ya viene enriquecido desde searchRegistroMoldes:
+        // estado, tipo_de_reparacion y responsable del registro más reciente en BD_moldes
         setEditForm((prev: any) => ({
             ...prev,
             codigo_molde: m.codigo_molde,
             titulo: m.titulo,
+            defectos_a_reparar: m.defectos_a_reparar || prev.defectos_a_reparar,
+            fecha_entrada: m.fecha_entrada || prev.fecha_entrada,
+            fecha_esperada: m.fecha_esperada || prev.fecha_esperada,
+            observaciones: m.observaciones || prev.observaciones,
+            // Campos enriquecidos desde BD_moldes (registro más reciente)
+            estado: m.estado || 'En reparacion',
+            tipo_de_reparacion: m.tipo_de_reparacion || prev.tipo_de_reparacion,
             responsable: m.responsable || prev.responsable,
-            estado: ['Entregado', 'En reparación', 'Destruido'].includes(m.estado) ? m.estado : 'En reparación'
         }))
         setMasterMolds([])
         setMasterSearch(m.codigo_molde)
@@ -288,11 +296,11 @@ export default function RegistroMoldesPage() {
             defectos_a_reparar: '',
             fecha_entrada: today,
             fecha_esperada: today,
-            estado: 'En reparación',
+            estado: 'En reparacion',
             observaciones: '',
             responsable: '',
             recibido: '',
-            tipo_de_reparacion: 'Reparación rápida',
+            tipo_de_reparacion: 'Rapida',
             tipo: 'Molde',
             usuario: user?.Nombre || 'Desconocido'
         })
@@ -304,8 +312,8 @@ export default function RegistroMoldesPage() {
         try {
             // Map app state to SAP expected state
             let sapEstado = editForm.estado;
-            if (editForm.estado === 'Entregado') sapEstado = 'Activo';
-            if (editForm.estado === 'Destruido') sapEstado = 'Baja';
+            if (editForm.estado === 'Entregado' || editForm.estado === 'ENTREGADO') sapEstado = 'Activo';
+            if (editForm.estado === 'Destruido' || editForm.estado === 'DESTRUIDO') sapEstado = 'Baja';
 
             // 1. SUPABASE UPDATE
             await moldsService.saveRegistro({
@@ -432,28 +440,31 @@ export default function RegistroMoldesPage() {
                             </div>
                         </div>
 
-                        {/* Search Bar - Upgraded to Autocomplete pointing to 'moldes' table per Requirement 2.2 */}
+                        {/* Search Bar - Connecting ONLY to BD_moldes per Requirement 1 */}
                         <div className="mt-8 md:mt-10 relative group">
                             <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                             <input
                                 type="text"
-                                placeholder="Escribe para buscar el molde en Maestro 'moldes'..."
+                                placeholder="Buscar molde en reparaciones (BD_moldes)..."
                                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[2rem] py-5 pl-16 pr-8 text-sm font-medium outline-none"
                                 value={searchTerm}
-                                onChange={(e) => handleGlobalSearchChange(e.target.value)}
-                                onFocus={() => { if(searchTerm.length >= 2) setShowGlobalResults(true) }}
+                                onChange={(e) => handleMainSearchChange(e.target.value)}
+                                onFocus={() => { if(searchTerm.length >= 2) setShowSuggestions(true) }}
                             />
-                            {showGlobalResults && globalMoldsResults.length > 0 && (
-                                <div ref={globalResultsRef} className="absolute top-full left-0 right-0 mt-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] shadow-2xl z-[100] p-4 max-h-[400px] overflow-y-auto animate-in slide-in-from-top-2 duration-200">
-                                    <h4 className="px-4 py-2 text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Resultados en Maestro 'moldes'</h4>
-                                    {globalMoldsResults.map((m) => (
+                            {showSuggestions && searchSuggestions.length > 0 && (
+                                <div ref={suggestionsRef} className="absolute top-full left-0 right-0 mt-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] shadow-2xl z-[100] p-4 max-h-[400px] overflow-y-auto animate-in slide-in-from-top-2 duration-200">
+                                    <h4 className="px-4 py-2 text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Sugerencias en reparaciones</h4>
+                                    {searchSuggestions.map((s, idx) => (
                                         <button 
-                                            key={m.id} 
-                                            onClick={() => selectGlobalMold(m)}
+                                            key={`${s.serial}-${idx}`} 
+                                            onClick={() => selectSuggestion(s)}
                                             className="w-full text-left p-5 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-2xl transition-all border-b border-slate-50 dark:border-slate-800 last:border-0 flex flex-col gap-1"
                                         >
-                                            <span className="text-sm font-black text-slate-900 dark:text-white">{m.serial}</span>
-                                            <span className="text-xs font-bold text-slate-400 uppercase">{m.nombre_articulo}</span>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-sm font-black text-slate-900 dark:text-white">{s.serial}</span>
+                                                <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-md text-slate-500">{s.estado}</span>
+                                            </div>
+                                            <span className="text-xs font-bold text-slate-400 uppercase truncate">{s.titulo}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -486,9 +497,9 @@ export default function RegistroMoldesPage() {
                                             </td>
                                             <td className="py-5 px-4">
                                                 <span className={`px-2.5 py-1 rounded-lg text-[8px] font-black border uppercase tracking-wider whitespace-nowrap ${
-                                                    (r.estado || '').includes('reparacion') || (r.estado || '') === 'En reparación' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 
-                                                    (r.estado || '').includes('Entregado') || (r.estado || '') === 'Activo' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
-                                                    (r.estado || '').includes('Destruido') || (r.estado || '') === 'Baja' ? 'bg-red-500/10 text-red-600 border-red-500/20' :
+                                                    (r.estado || '').toLowerCase().includes('reparacion') ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 
+                                                    (r.estado || '').toLowerCase().includes('entregado') || (r.estado || '').toLowerCase() === 'activo' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
+                                                    (r.estado || '').toLowerCase().includes('destruido') || (r.estado || '').toLowerCase() === 'baja' ? 'bg-red-500/10 text-red-600 border-red-500/20' :
                                                     'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
                                                 }`}>
                                                     {r.estado || 'Sin Estado'}
@@ -611,8 +622,11 @@ export default function RegistroMoldesPage() {
                                             value={editForm.estado || ''}
                                             onChange={(e) => setEditForm({...editForm, estado: e.target.value})}
                                         >
+                                            <option value="">Seleccione Estado</option>
+                                            <option value="En reparacion">En Reparación</option>
+                                            <option value="En espera - Produccion">En Espera - Producción</option>
+                                            <option value="En espera - Moldes">En Espera - Moldes</option>
                                             <option value="Entregado">Entregado</option>
-                                            <option value="En reparación">En reparación</option>
                                             <option value="Destruido">Destruido</option>
                                         </select>
                                     </div>
@@ -625,8 +639,10 @@ export default function RegistroMoldesPage() {
                                         value={editForm.tipo_de_reparacion || ''}
                                         onChange={(e) => setEditForm({...editForm, tipo_de_reparacion: e.target.value})}
                                     >
-                                        <option value="Reparación rápida">Reparación rápida</option>
-                                        <option value="Reparación especial">Reparación especial</option>
+                                        <option value="">Seleccione Tipo</option>
+                                        <option value="Rapida">Reparación Rápida</option>
+                                        <option value="Especial">Reparación Especial</option>
+                                        <option value="Desmanchado">Desmanchado</option>
                                     </select>
                                 </div>
 

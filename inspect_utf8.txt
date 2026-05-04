@@ -1,7 +1,0 @@
-﻿[dotenv@17.3.1] injecting env (8) from .env -- tip: ÔÜÖ´©Å  load multiple .env files with { path: ['.env.local', '.env'] }
---- TABLE: Materia prima moldes ---
-Columns: N├║mero de art├¡culo SAP, Materia Prima, Unidad de medida de compras, Usuario
-Sample: {"N├║mero de art├¡culo SAP":"CEMP02-0078-000-0000","Materia Prima":"ROLLO CINTA TRANSPARENTE 3/4IN 18mm","Unidad de medida de compras":"UN","Usuario":null}
---- TABLE: moldes ---
-Columns: id, created_at, serial, estado, vueltas_actuales, vueltas_acumuladas, tipo_molde_id, observaciones, modificado_por, modificado_desde, modified_at, vueltas_mto_atipicas, tipo_molde_sku, Fecha_de_ingreso, Fecha_de_entrega, Fecha_esperada, Estado_reparacion, Observaciones_reparacion, Responsable, Tipo_de_reparacion, descripcion_molde, nombre_articulo
-Sample: {"id":1944,"created_at":"2025-11-24T13:24:47.359081","serial":"215-04","estado":"Disponible","vueltas_actuales":32,"vueltas_acumuladas":37,"tipo_molde_id":417,"observaciones":"","modificado_por":"Alejandro Vegas","modificado_desde":"supabase","modified_at":"2026-03-24T10:12:08.111","vueltas_mto_atipicas":36,"tipo_molde_sku":null,"Fecha_de_ingreso":"2025-11-24","Fecha_de_entrega":null,"Fecha_esperada":"2026-02-12","Estado_reparacion":"En espera-moldes","Observaciones_reparacion":"Reemplazo","Responsable":"Bernardo Alfredo Restrepo Calle ","Tipo_de_reparacion":"Especial","descripcion_molde":null,"nombre_articulo":"MOLDE LAVAMANOS OSLO 155X48"}

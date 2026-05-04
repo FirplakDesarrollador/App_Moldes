@@ -31,8 +31,8 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
     const [formData, setFormData] = useState<Partial<Mold>>({
         nombre_articulo: '',
         serial: '',
-        estado: 'Disponible',
-        Estado_reparacion: 'En espera-moldes',
+        estado: 'DISPONIBLE',
+        Estado_reparacion: 'EN ESPERA - MOLDES',
         Responsable: '',
         Tipo_de_reparacion: 'Rapida',
         Fecha_de_ingreso: new Date().toISOString().split('T')[0],
@@ -152,32 +152,32 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                         <div className="space-y-4">
-                            <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Estado Operativo</label>
+                            <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Estado Operativo (Maestro)</label>
                             <select
                                 value={formData.estado || ''}
                                 onChange={e => setFormData({ ...formData, estado: e.target.value })}
                                 className="w-full bg-black/5 dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-2xl py-5 px-8 font-bold text-slate-900 dark:text-white outline-none appearance-none"
                             >
-                                <option value="Disponible">Disponible</option>
-                                <option value="En uso">En uso</option>
-                                <option value="En reparacion">En reparación</option>
-                                <option value="En fabricacion">En fabricación</option>
-                                <option value="Destruido">Destruido</option>
-                                <option value="Indefinido">Indefinido</option>
+                                <option value="DISPONIBLE">Disponible</option>
+                                <option value="EN USO">En uso</option>
+                                <option value="EN REPARACION">En reparación</option>
+                                <option value="EN FABRICACION">En fabricación</option>
+                                <option value="DESTRUIDO">Destruido</option>
+                                <option value="INDEFINIDO">Indefinido</option>
                             </select>
                         </div>
                         <div className="space-y-4">
-                            <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Estado Reparación</label>
+                            <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Estado Reparación (Actual)</label>
                             <select
-                                value={formData.Estado_reparacion || ''}
-                                onChange={e => setFormData({ ...formData, Estado_reparacion: e.target.value })}
+                                value={formData.estado || ''}
+                                onChange={e => setFormData({ ...formData, estado: e.target.value })}
                                 className="w-full bg-black/5 dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-2xl py-5 px-8 font-bold text-slate-900 dark:text-white outline-none appearance-none"
                             >
-                                <option value="En espera-moldes">En espera - Moldes</option>
-                                <option value="En espera-produccion">En espera - Producción</option>
-                                <option value="En reparacion">En reparación</option>
-                                <option value="Entregado">Entregado</option>
-                                <option value="Destruido">Destruido</option>
+                                <option value="EN REPARACION">En reparación</option>
+                                <option value="EN ESPERA - PRODUCCION">En espera - Producción</option>
+                                <option value="EN ESPERA - MOLDES">En espera - Moldes</option>
+                                <option value="ENTREGADO">Entregado</option>
+                                <option value="DESTRUIDO">Destruido</option>
                             </select>
                         </div>
                     </div>
