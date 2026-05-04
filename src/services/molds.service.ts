@@ -107,16 +107,25 @@ export const moldsService = {
     },
 
     // SEARCH: Registro Moldes - busca en historico y enriquece con datos actuales de BD_moldes
-    async searchRegistroMoldes(query: string) {
+    async searchRegistroMoldes(query: string, type?: 'codigo' | 'titulo') {
         if (!query.trim()) return []
         const supabase = createClient()
         const term = `%${query.trim()}%`
 
         // 1. Buscar en base_datos_historico_moldes como fuente de búsqueda
-        const { data: historicoData, error: historicoError } = await supabase
+        let q = supabase
             .from('base_datos_historico_moldes')
             .select('*')
-            .or(`codigo_molde.ilike.${term},titulo.ilike.${term}`)
+        
+        if (type === 'codigo') {
+            q = q.ilike('codigo_molde', term)
+        } else if (type === 'titulo') {
+            q = q.ilike('titulo', term)
+        } else {
+            q = q.or(`codigo_molde.ilike.${term},titulo.ilike.${term}`)
+        }
+
+        const { data: historicoData, error: historicoError } = await q
             .order('fecha_entrada', { ascending: false })
             .limit(20)
 
@@ -130,24 +139,29 @@ export const moldsService = {
 
         if (codigosUnicos.length === 0) return []
 
-        // 2. Obtener el registro MÁS RECIENTE de cada molde en BD_moldes
+        // 2. Obtener los registros de BD_moldes para todos los códigos en UNA SOLA consulta (Optimización 40k+)
         const bdMoldesMap: Record<string, any> = {}
-        for (const codigo of codigosUnicos) {
-            const { data: bdData } = await supabase
-                .from('BD_moldes')
-                .select('"ESTADO", "Tipo de reparacion", "Responsable", "FECHA ENTRADA"')
-                .ilike('"CODIGO MOLDE"', codigo.trim())
-                .order('"FECHA ENTRADA"', { ascending: false })
-                .limit(1)
+        const { data: allBdData, error: bdError } = await supabase
+            .from('BD_moldes')
+            .select('"CODIGO MOLDE", "ESTADO", "Tipo de reparacion", "Responsable", "FECHA ENTRADA"')
+            .in('"CODIGO MOLDE"', codigosUnicos)
+            .order('"FECHA ENTRADA"', { ascending: false })
 
-            if (bdData && bdData.length > 0) {
-                bdMoldesMap[codigo.trim().toUpperCase()] = bdData[0]
-            }
+        if (!bdError && allBdData) {
+            // Procesar en JS para quedarnos con el más reciente de cada uno
+            allBdData.forEach((row: any) => {
+                const key = (row["CODIGO MOLDE"] || '').trim().toUpperCase()
+                if (!bdMoldesMap[key]) {
+                    bdMoldesMap[key] = row
+                }
+            })
         }
 
-        // 3. Desduplicar por codigo_molde (un resultado por molde)
+        // 3. Desduplicar por codigo_molde (un resultado por molde) y ordenar por similitud
         const seen = new Set<string>()
         const results: any[] = []
+        const queryLower = query.trim().toLowerCase()
+
         for (const m of (historicoData || [])) {
             const key = (m.codigo_molde || '').trim().toUpperCase()
             if (seen.has(key)) continue
@@ -167,7 +181,27 @@ export const moldsService = {
             })
         }
 
-        return results
+        // Ordenar por similitud
+        return results.sort((a, b) => {
+            const aCode = (a.codigo_molde || '').toLowerCase()
+            const bCode = (b.codigo_molde || '').toLowerCase()
+            const aTitle = (a.titulo || '').toLowerCase()
+            const bTitle = (b.titulo || '').toLowerCase()
+
+            // Prioridad 1: Empieza exactamente por el código
+            const aStartsCode = aCode.startsWith(queryLower)
+            const bStartsCode = bCode.startsWith(queryLower)
+            if (aStartsCode && !bStartsCode) return -1
+            if (!aStartsCode && bStartsCode) return 1
+
+            // Prioridad 2: Empieza exactamente por el título
+            const aStartsTitle = aTitle.startsWith(queryLower)
+            const bStartsTitle = bTitle.startsWith(queryLower)
+            if (aStartsTitle && !bStartsTitle) return -1
+            if (!aStartsTitle && bStartsTitle) return 1
+
+            return 0
+        })
     },
 
     // SEARCH: Sugerencias directas desde BD_moldes (para el buscador de la lista principal)
@@ -348,7 +382,7 @@ export const moldsService = {
     },
 
     // ── syncMoldEstado: Mapea el estado de BD_moldes al estado en la tabla maestra 'moldes' ──
-    async syncMoldEstado(codigoMolde: string, estadoBD: string): Promise<void> {
+    async syncMoldEstado(codigoMolde: string, estadoBD: string, titulo?: string): Promise<void> {
         const supabase = createClient()
 
         // 1. Normalizar código y estado
@@ -396,14 +430,40 @@ export const moldsService = {
         }
 
         if (!moldData || moldData.length === 0) {
-            console.warn(`[syncMoldEstado] Molde "${codigoNorm}" no encontrado en tabla 'moldes'. Sin sincronización.`)
+            // INSERT: Si el molde es totalmente nuevo y no existe en la maestra
+            console.log(`[syncMoldEstado] Molde "${codigoNorm}" no encontrado. Creando en tabla maestra...`)
+            
+            // Determinar un tipo_molde_id razonable (Requerido por la DB)
+            // 474 es el ID común para "Moldes" en la base de datos actual
+            const tipoId = (titulo || '').toLowerCase().includes('contramolde') ? 474 : 474; 
+
+            const { error: insertError } = await supabase
+                .from('moldes')
+                .insert([{ 
+                    serial: codigoNorm, 
+                    nombre_articulo: titulo || 'Molde Nuevo',
+                    estado: estadoDestino,
+                    vueltas_actuales: estadoDestino === 'Disponible' ? 0 : 0,
+                    tipo_molde_id: tipoId,
+                    modificado_por: 'Sistema',
+                    modificado_desde: 'supabase'
+                }])
+
+            if (insertError) {
+                console.warn('[syncMoldEstado] Error creando molde nuevo en maestra:', insertError.message)
+            }
             return
         }
 
-        // 4. Actualizar SOLO el campo 'estado' en moldes
+        // 4. Actualizar SOLO el campo 'estado' (y resetear vueltas si está disponible)
+        const updateData: any = { estado: estadoDestino }
+        if (estadoDestino === 'Disponible') {
+            updateData.vueltas_actuales = 0
+        }
+
         const { error: updateError } = await supabase
             .from('moldes')
-            .update({ estado: estadoDestino })
+            .update(updateData)
             .eq('id', moldData[0].id)
 
         if (updateError) {
@@ -472,6 +532,7 @@ export const moldsService = {
         } else {
             // INSERT: Registro totalmente nuevo
             console.log(`[saveRegistro] INSERTANDO NUEVO en BD_moldes → CODIGO: "${codigoMolde}"`)
+            dbRecord.id = Date.now() // Generar ID manual para evitar error de NOT NULL
             dbRecord["Created"] = now
             dbRecord["Created By"] = record.usuario || 'Mantenimiento'
             
@@ -513,7 +574,7 @@ export const moldsService = {
         }
 
         // 4. SINCRONIZAR ESTADO en tabla maestra 'moldes' (solo campo estado)
-        await this.syncMoldEstado(codigoMolde, record.estado)
+        await this.syncMoldEstado(codigoMolde, record.estado, record.titulo)
 
         return saved
     },

@@ -44,6 +44,7 @@ export default function RegistroMoldesPage() {
     // Autocomplete for Master Molds
     const [masterMolds, setMasterMolds] = useState<any[]>([])
     const [masterSearch, setMasterSearch] = useState('')
+    const [masterSearchType, setMasterSearchType] = useState<'codigo' | 'titulo'>('codigo')
 
     // Defect Dropdown State
     const [defectSearch, setDefectSearch] = useState('')
@@ -177,16 +178,24 @@ export default function RegistroMoldesPage() {
         fetchInitial(s.serial, filterView)
     }
 
-    // Modal search (within Nuevo registro): must use BD_moldes
-    async function handleMasterSearch(val: string) {
+    // Modal search (within Nuevo registro): must use base_datos_historico_moldes
+    async function handleMasterSearch(val: string, type: 'codigo' | 'titulo') {
         setMasterSearch(val)
+        setMasterSearchType(type)
+        
+        // Sincronizar con el formulario para permitir ingreso manual si es necesario
+        if (type === 'codigo') {
+            setEditForm((prev: any) => ({ ...prev, codigo_molde: val }))
+        } else {
+            setEditForm((prev: any) => ({ ...prev, titulo: val }))
+        }
+
         if (val.length < 2) {
             setMasterMolds([])
             return
         }
         try {
-            // Requirement 2.4: Nuevo registro list must connect to BD_moldes
-            const results = await moldsService.searchRegistroMoldes(val)
+            const results = await moldsService.searchRegistroMoldes(val, type)
             setMasterMolds(results || [])
         } catch (e) {
             console.error(e)
@@ -217,35 +226,37 @@ export default function RegistroMoldesPage() {
     // Requirement 2.6: Calculation excluding Sat, Sun and holidays
     const calculateExpectedDate = (entryDate: string, selectedDefects: string) => {
         if (!entryDate) return ''
-        const date = new Date(entryDate)
+        const date = new Date(entryDate + 'T00:00:00') // Asegurar hora local 00:00
         
-        let totalDays = 0;
+        let totalTime = 0;
         const defectArray = selectedDefects.split(',').map(d => d.trim());
         defectArray.forEach(title => {
             const defRecord = defectsCatalog.find(d => d.titulo === title);
             if (defRecord) {
-                totalDays += (defRecord.tiempo || 0);
+                totalTime += (defRecord.tiempo || 0);
             }
         });
 
-        if (totalDays <= 0) return entryDate;
+        if (totalTime <= 0) return entryDate;
 
         const holidays = Array.isArray(holidaysData) ? (holidaysData as string[]) : [];
-        let addedDays = 0;
-        let targetDays = Math.ceil(totalDays);
+        
+        // Si el tiempo es p.ej. 0.5 (12h), sumamos 0 días adicionales (mismo día)
+        // Si es 1.5, sumamos 1 día adicional.
+        let daysToAdd = Math.floor(totalTime);
+        let added = 0;
 
-        while (addedDays < targetDays) {
+        while (added < daysToAdd) {
             date.setDate(date.getDate() + 1);
             const day = date.getDay(); // 0: Sun, 6: Sat
             const dateStr = date.toISOString().split('T')[0];
 
             if (day !== 0 && day !== 6 && !holidays.includes(dateStr)) {
-                addedDays++;
+                added++;
             }
         }
 
-        // If the result finally falls on a non-business day (though the loop logic prevents it for addedDays > 0),
-        // we ensure it's pushed to next. (Shouldn't happen with the while logic but for completeness)
+        // Asegurarnos de que el día resultante sea hábil (p.ej. si cayó en sábado, mover a lunes)
         let finalDay = date.getDay();
         let finalStr = date.toISOString().split('T')[0];
         while (finalDay === 0 || finalDay === 6 || holidays.includes(finalStr)) {
@@ -578,12 +589,12 @@ export default function RegistroMoldesPage() {
                                                 type="text" 
                                                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 text-sm font-bold outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all uppercase" 
                                                 placeholder="Escribe código (ej: 215-04)"
-                                                value={masterSearch || ''}
-                                                onChange={(e) => handleMasterSearch(e.target.value.toUpperCase())}
+                                                value={masterSearchType === 'codigo' ? masterSearch : (editForm.codigo_molde || '')}
+                                                onChange={(e) => handleMasterSearch(e.target.value.toUpperCase(), 'codigo')}
                                             />
-                                            {masterMolds.length > 0 && (
+                                            {masterMolds.length > 0 && masterSearchType === 'codigo' && (
                                                 <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 p-2 max-h-60 overflow-y-auto overflow-x-hidden">
-                                                    <h4 className="px-4 py-2 text-[9px] font-black text-amber-500 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 mb-2">Registros en 'BD_moldes'</h4>
+                                                    <h4 className="px-4 py-2 text-[9px] font-black text-blue-500 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 mb-2">Sugerencias del Histórico</h4>
                                                     {masterMolds.map((m) => (
                                                         <button 
                                                             key={m.id} 
@@ -601,13 +612,37 @@ export default function RegistroMoldesPage() {
                                     
                                     <div className="relative group">
                                         <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-2 absolute -top-2 left-6 bg-white dark:bg-[#0f172a] z-10 transition-colors group-focus-within:text-blue-500">Título / Referencia</label>
-                                        <input 
-                                            type="text" 
-                                            className="w-full bg-slate-50 dark:bg-slate-951 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 text-sm font-bold outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all" 
-                                            value={editForm.titulo || ''} 
-                                            readOnly={!isCreateMode}
-                                            onChange={(e) => setEditForm({...editForm, titulo: e.target.value})} 
-                                        />
+                                        <div className="relative">
+                                            <input 
+                                                type="text" 
+                                                className="w-full bg-slate-50 dark:bg-slate-951 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 text-sm font-bold outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all" 
+                                                value={editForm.titulo || ''} 
+                                                readOnly={!isCreateMode && !((editForm.defectos_a_reparar || '').toLowerCase().includes('nuevo'))}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (isCreateMode) {
+                                                        handleMasterSearch(val, 'titulo');
+                                                    } else {
+                                                        setEditForm({...editForm, titulo: val});
+                                                    }
+                                                }} 
+                                            />
+                                            {masterMolds.length > 0 && masterSearchType === 'titulo' && (
+                                                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 p-2 max-h-60 overflow-y-auto overflow-x-hidden">
+                                                    <h4 className="px-4 py-2 text-[9px] font-black text-blue-500 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 mb-2">Sugerencias del Histórico</h4>
+                                                    {masterMolds.map((m) => (
+                                                        <button 
+                                                            key={m.id} 
+                                                            onClick={() => selectMasterMoldFromBD(m)}
+                                                            className="w-full text-left p-4 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-xl transition-all flex flex-col gap-1 border-b border-slate-50 dark:border-slate-800/50 last:border-0"
+                                                        >
+                                                            <span className="text-xs font-black text-slate-900 dark:text-white">{m.codigo_molde}</span>
+                                                            <span className="text-[10px] font-bold text-slate-500 truncate">{m.titulo}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -620,7 +655,14 @@ export default function RegistroMoldesPage() {
                                         <select 
                                             className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 text-xs font-black uppercase outline-none focus:ring-4 focus:ring-blue-500/5"
                                             value={editForm.estado || ''}
-                                            onChange={(e) => setEditForm({...editForm, estado: e.target.value})}
+                                            onChange={(e) => {
+                                                const newStatus = e.target.value;
+                                                const updates: any = { estado: newStatus };
+                                                if (newStatus === 'Entregado' && !editForm.fecha_entrega) {
+                                                    updates.fecha_entrega = new Date().toISOString().split('T')[0];
+                                                }
+                                                setEditForm({...editForm, ...updates});
+                                            }}
                                         >
                                             <option value="">Seleccione Estado</option>
                                             <option value="En reparacion">En Reparación</option>
@@ -741,6 +783,15 @@ export default function RegistroMoldesPage() {
                                                 const expected = calculateExpectedDate(newDate, editForm.defectos_a_reparar || '');
                                                 setEditForm({...editForm, fecha_entrada: newDate, fecha_esperada: expected});
                                             }}
+                                        />
+                                    </div>
+                                    <div className="space-y-4">
+                                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">Fecha de Entrega (Real)</label>
+                                        <input 
+                                            type="date" 
+                                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 text-sm font-bold outline-none uppercase" 
+                                            value={editForm.fecha_entrega || ''}
+                                            onChange={(e) => setEditForm({...editForm, fecha_entrega: e.target.value})}
                                         />
                                     </div>
                                     <div className="space-y-4">
