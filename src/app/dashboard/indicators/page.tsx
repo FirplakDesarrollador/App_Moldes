@@ -362,7 +362,8 @@ export default function IndicatorsPage() {
                                         {[
                                             { label: 'MS (Mármol Sint.)', value: rapidaResult.countMS, weight: '×1', color: 'text-emerald-600', bg: 'bg-emerald-50' },
                                             { label: 'FV (Fibra Vidrio)', value: rapidaResult.countFV, weight: '×1', color: 'text-sky-600', bg: 'bg-sky-50' },
-                                            { label: 'Desmanchados', value: rapidaResult.countDesmanchado, weight: '×⅓', color: 'text-orange-600', bg: 'bg-orange-50' },
+                                            { label: 'Desmanch. MS', value: rapidaResult.countDesmanchadoMS, weight: '×⅓', color: 'text-orange-600', bg: 'bg-orange-50' },
+                                            { label: 'Desmanch. FV', value: rapidaResult.countDesmanchadoFV, weight: '×½', color: 'text-amber-600', bg: 'bg-amber-50' },
                                         ].map(item => (
                                             <div key={item.label} className={`rounded-2xl p-4 border border-slate-100 dark:border-slate-800 ${item.bg} space-y-1`}>
                                                 <div className="flex items-center justify-between"><span className={`text-2xl font-black ${item.color}`}>{item.value}</span><span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-white/60 ${item.color}`}>{item.weight}</span></div>
@@ -458,7 +459,12 @@ export default function IndicatorsPage() {
                                             return (
                                                 <tr key={`rap-${m.id}-${i}`} className="hover:bg-slate-50/60 transition-colors">
                                                     <td className="py-4 px-6"><div className="flex items-start gap-2"><span className="mt-1.5 w-2 h-2 rounded-full bg-amber-500"></span><div><p className="text-xs font-black text-slate-900 uppercase leading-normal">{m.titulo}</p><p className="text-[10px] font-mono text-slate-400">{m.codigo}</p></div></div></td>
-                                                    <td className="py-4 px-6"><span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${m.tipo_calculado === 'MS' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : m.tipo_calculado === 'FV' ? 'bg-sky-50 text-sky-600 border-sky-200' : m.tipo_calculado === 'Brillado' ? 'bg-yellow-50 text-yellow-600 border-yellow-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>{m.tipo_calculado}</span></td>
+                                                    <td className="py-4 px-6"><span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border 
+                                                        ${m.tipo_calculado === 'MS' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 
+                                                          m.tipo_calculado === 'FV' ? 'bg-sky-50 text-sky-600 border-sky-200' : 
+                                                          m.tipo_calculado === 'Desmanchado MS' ? 'bg-orange-50 text-orange-600 border-orange-200' :
+                                                          m.tipo_calculado === 'Desmanchado FV' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                                                          'bg-slate-50 text-slate-600 border-slate-200'}`}>{m.tipo_calculado}</span></td>
                                                     <td className="py-4 px-6 text-xs text-slate-500">{format(m.fecha_entrada)}</td>
                                                     <td className="py-4 px-6 text-xs text-slate-500">{format(m.fecha_esperada)}</td>
                                                     <td className="py-4 px-6 text-xs font-bold text-slate-700">{format(m.fecha_entrega)}</td>

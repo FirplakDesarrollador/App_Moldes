@@ -52,6 +52,11 @@ export default function RawMaterialConsumption() {
     const [showMoldResults, setShowMoldResults] = useState(false)
     const [isSearchingMolds, setIsSearchingMolds] = useState(false)
 
+    // Material Search
+    const [materialSearchTerm, setMaterialSearchTerm] = useState('')
+    const [showMaterialResults, setShowMaterialResults] = useState(false)
+    const [filteredMaterials, setFilteredMaterials] = useState<any[]>([])
+
     useEffect(() => {
         const storedUser = localStorage.getItem('moldapp_user')
         if (storedUser) setUser(JSON.parse(storedUser))
@@ -60,6 +65,7 @@ export default function RawMaterialConsumption() {
             try {
                 const materials = await moldsService.getRawMaterials()
                 setRawMaterials(materials || [])
+                setFilteredMaterials(materials || [])
             } catch (error) {
                 console.error('Error loading materials:', error)
             } finally {
@@ -69,22 +75,38 @@ export default function RawMaterialConsumption() {
         loadData()
     }, [])
 
-    const handleMaterialChange = (id: string) => {
-        const mat = rawMaterials.find(m => String(m.id) === String(id))
-        if (mat) {
-            // Autocomplete based on instructores (Título, CODIGO MP, UNDS, etc)
-            // m.raw contains the original Supabase record
-            const r = mat.raw;
-            setFormData(prev => ({
-                ...prev,
-                id: mat.id,
-                titulo: r.Título || r['Materia Prima'] || 'Sin Título',
-                codigo_mp: r['CODIGO MP'] || r['Número de artículo SAP'] || 'S/C',
-                unds: r.UNDS || r['Unidad de medida de compras'] || 'UN',
-                mp_molde: r['MP MOLDE'] || '--',
-                mp_molde_codigo: r['MP MOLDE CODIGO'] || '--'
-            }))
+    const handleMaterialSearch = (val: string) => {
+        setMaterialSearchTerm(val)
+        if (!val.trim()) {
+            setFilteredMaterials(rawMaterials)
+            setShowMaterialResults(false)
+            return
         }
+        
+        const term = val.toLowerCase()
+        const filtered = rawMaterials.filter(m => 
+            (m.titulo || '').toLowerCase().includes(term) ||
+            (m.raw?.['CODIGO MP'] || '').toLowerCase().includes(term)
+        )
+        setFilteredMaterials(filtered)
+        setShowMaterialResults(true)
+    }
+
+    const selectMaterial = (mat: any) => {
+        // Autocomplete based on instructores (Título, CODIGO MP, UNDS, etc)
+        // m.raw contains the original Supabase record
+        const r = mat.raw;
+        setFormData(prev => ({
+            ...prev,
+            id: mat.id,
+            titulo: r.Título || r['Materia Prima'] || 'Sin Título',
+            codigo_mp: r['CODIGO MP'] || r['Número de artículo SAP'] || 'S/C',
+            unds: r.UNDS || r['Unidad de medida de compras'] || 'UN',
+            mp_molde: r['MP MOLDE'] || '--',
+            mp_molde_codigo: r['MP MOLDE CODIGO'] || '--'
+        }))
+        setMaterialSearchTerm(r.Título || r['Materia Prima'] || 'Sin Título')
+        setShowMaterialResults(false)
     }
 
     const handleSave = async (e: React.FormEvent) => {
@@ -171,6 +193,7 @@ export default function RawMaterialConsumption() {
                 relacion_molde_nombre: ''
             })
             setMoldSearchTerm('')
+            setMaterialSearchTerm('')
         } catch (error: any) {
             console.error(error)
             setMessage({ type: 'error', text: 'Fallo técnica: ' + (error.message || 'Error desconocido') })
@@ -251,18 +274,35 @@ export default function RawMaterialConsumption() {
                                     <Package className="w-4 h-4 text-emerald-500" /> Material Base
                                 </label>
                                 <div className="relative">
-                                    <select
+                                    <input
                                         required
-                                        className="w-full bg-slate-50 dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-3xl py-6 px-10 font-black text-xs text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-emerald-500/10 appearance-none transition-all cursor-pointer uppercase"
-                                        value={formData.id}
-                                        onChange={(e) => handleMaterialChange(e.target.value)}
-                                    >
-                                        <option value="" disabled hidden>BUSCAR EN MATERIA_PRIMA_MOLDES...</option>
-                                        {rawMaterials.map(m => (
-                                            <option key={m.id} value={m.id}>{m.titulo}</option>
-                                        ))}
-                                    </select>
-                                    <ChevronDown className="absolute right-10 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-400 pointer-events-none" />
+                                        type="text"
+                                        autoComplete="off"
+                                        placeholder="BUSCAR EN MATERIA_PRIMA_MOLDES..."
+                                        className="w-full bg-slate-50 dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-3xl py-6 px-10 font-black text-xs text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all uppercase relative z-10"
+                                        value={materialSearchTerm}
+                                        onChange={(e) => handleMaterialSearch(e.target.value)}
+                                        onFocus={() => setShowMaterialResults(true)}
+                                    />
+                                    <Search className="absolute right-10 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 z-20 pointer-events-none" />
+                                    
+                                    {showMaterialResults && filteredMaterials.length > 0 && (
+                                        <div className="absolute top-full left-0 right-0 mt-4 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl z-50 p-4 max-h-60 overflow-y-auto overflow-x-hidden">
+                                            {filteredMaterials.map(m => (
+                                                <button
+                                                    key={m.id}
+                                                    type="button"
+                                                    onClick={() => selectMaterial(m)}
+                                                    className="w-full text-left p-4 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-2xl transition-all border-b border-slate-50 dark:border-slate-800/50 last:border-0"
+                                                >
+                                                    <div className="text-xs font-black text-slate-900 dark:text-white uppercase">{m.titulo}</div>
+                                                    <div className="text-[10px] font-bold text-slate-500 uppercase truncate">
+                                                        Código: {m.raw?.['CODIGO MP'] || m.raw?.['Número de artículo SAP'] || 'S/C'}
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

@@ -45,7 +45,9 @@ export interface RapidaKPIResult {
     totalMoldesReparados: number   // weighted: MS+FV + brillados*0.5 + desmanchados*0.333
     countMS: number
     countFV: number
-    countDesmanchado: number       // raw count
+    countDesmanchadoMS: number     // new: MS desmanchados (weight 1/3)
+    countDesmanchadoFV: number     // new: FV desmanchados (weight 1/2)
+    countDesmanchado: number       // total raw count (for compatibility)
     moldesEsperados: number        // FECHA ESPERADA in range
     moldesEntregados: number       // FECHA ENTREGA in range AND FECHA ESPERADA <= range end
     metaTotal: number              // 24 × numDays
@@ -214,6 +216,8 @@ export const indicatorsService = {
 
         let countMS = 0
         let countFV = 0
+        let countDesmanchadoMS = 0
+        let countDesmanchadoFV = 0
         let countDesmanchado = 0
         let weightedTotal = 0
         const reparadosFormatted: any[] = []
@@ -227,20 +231,30 @@ export const indicatorsService = {
             const { desmanchado } = classifyDefecto(r['DEFECTOS A REPARAR'])
             let tipoCalculado = 'Otros'
 
+            const serial = normalize(String(r['CODIGO MOLDE'] || ''))
+            const plantaVal = plantaMap[serial] || ''
+            const isMS = plantaVal.includes('MS')
+            const isFV = plantaVal.includes('FV')
+
             if (desmanchado) {
                 countDesmanchado++
-                weightedTotal += 1 / 3
-                tipoCalculado = 'Desmanchado'
+                if (isFV) {
+                    countDesmanchadoFV++
+                    weightedTotal += 1 / 2
+                    tipoCalculado = 'Desmanchado FV'
+                } else {
+                    // Default to MS weight (1/3) if MS or unknown
+                    countDesmanchadoMS++
+                    weightedTotal += 1 / 3
+                    tipoCalculado = 'Desmanchado MS'
+                }
             } else {
                 // Regular: classify MS or FV
-                const serial = normalize(String(r['CODIGO MOLDE'] || ''))
-                const plantaVal = plantaMap[serial] || ''
-                
-                if (plantaVal.includes('MS')) {
+                if (isMS) {
                     countMS++
                     weightedTotal += 1
                     tipoCalculado = 'MS'
-                } else if (plantaVal.includes('FV')) {
+                } else if (isFV) {
                     countFV++
                     weightedTotal += 1
                     tipoCalculado = 'FV'
@@ -286,7 +300,9 @@ export const indicatorsService = {
 
         return {
             totalMoldesReparados,
-            countMS, countFV, countDesmanchado,
+            countMS, countFV, 
+            countDesmanchadoMS, countDesmanchadoFV,
+            countDesmanchado,
             moldesEsperados, moldesEntregados,
             metaTotal, metaPorPersona, totalOperarios, numDays,
             productividad, nivelServicio, productividadHH,
