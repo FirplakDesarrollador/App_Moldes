@@ -53,6 +53,89 @@ function gaugeColor(v: number) {
 type RowTag = 'comprometido' | 'entregado' | 'ambos'
 interface TableRow extends MoldIndicatorRow { tag: RowTag; cumple: boolean }
 
+// ── Pareto Chart Component ───────────────────────────────────────────────────
+function ParetoChart({ rows }: { rows: MoldIndicatorRow[] }) {
+    const data = useMemo(() => {
+        const counts: Record<string, number> = {}
+        let totalCount = 0
+        
+        rows.forEach(r => {
+            const list = (r.defectos || '').split(',')
+                .map(s => s.trim())
+                .filter(s => s.length > 0 && s.toLowerCase() !== 'molde nuevo' && s.toLowerCase() !== 'modelo nuevo')
+            
+            list.forEach(def => {
+                counts[def] = (counts[def] || 0) + 1
+                totalCount++
+            })
+        })
+
+        const sorted = Object.entries(counts)
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 10) // Top 10
+
+        let runningSum = 0
+        return sorted.map(item => {
+            runningSum += item.count
+            return {
+                ...item,
+                cumulative: totalCount > 0 ? (runningSum / totalCount) * 100 : 0
+            }
+        })
+    }, [rows])
+
+    if (data.length === 0) return (
+        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 p-12 text-center">
+            <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-4" />
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Sin defectos registrados en este período</p>
+        </div>
+    )
+
+    const maxCount = Math.max(...data.map(d => d.count))
+    const chartHeight = 200
+    const barWidth = 40
+    const gap = 20
+
+    return (
+        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 shadow-sm p-8 lg:p-12 space-y-8 overflow-hidden">
+            <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                    <h3 className="text-sm font-black flex items-center gap-3">
+                        <BarChart3 className="w-5 h-5 text-indigo-500" /> 
+                        Pareto de Defectos
+                    </h3>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Top 10 problemas reportados</p>
+                </div>
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-indigo-500"></span><span className="text-[8px] font-black uppercase text-slate-400">Frecuencia</span></div>
+                    <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-orange-400"></span><span className="text-[8px] font-black uppercase text-slate-400">% Acumulado</span></div>
+                </div>
+            </div>
+
+            <div className="relative pt-10">
+                <div className="overflow-x-auto pb-4">
+                    <svg width={Math.max(800, data.length * (barWidth + gap) + 100)} height={chartHeight + 100} className="mx-auto">
+                        {data.map((d, i) => {
+                            const h = (d.count / maxCount) * chartHeight
+                            const x = i * (barWidth + gap) + 50
+                            return (
+                                <g key={d.name} className="group">
+                                    <rect x={x} y={chartHeight - h + 20} width={barWidth} height={h} rx={6} className="fill-indigo-500/10 group-hover:fill-indigo-500 transition-all duration-500" />
+                                    <text x={x + barWidth/2} y={chartHeight - h + 10} textAnchor="middle" className="text-[10px] font-black fill-slate-400 group-hover:fill-indigo-600 transition-colors">{d.count}</text>
+                                    <text x={x + barWidth/2} y={chartHeight + 40} textAnchor="end" transform={`rotate(-45, ${x + barWidth/2}, ${chartHeight + 40})`} className="text-[8px] font-black fill-slate-500 uppercase tracking-tighter">{d.name.length > 20 ? d.name.substring(0, 20) + '...' : d.name}</text>
+                                </g>
+                            )
+                        })}
+                        <path d={data.map((d, i) => { const x = i * (barWidth + gap) + 50 + barWidth/2; const y = chartHeight - (d.cumulative / 100) * chartHeight + 20; return `${i === 0 ? 'M' : 'L'} ${x} ${y}` }).join(' ')} className="stroke-orange-400 fill-none stroke-[3]" />
+                        {data.map((d, i) => { const x = i * (barWidth + gap) + 50 + barWidth/2; const y = chartHeight - (d.cumulative / 100) * chartHeight + 20; return <circle key={`dot-${i}`} cx={x} cy={y} r={4} className="fill-white stroke-orange-400 stroke-2" /> })}
+                    </svg>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 // ── Rápida KPI Card component ─────────────────────────────────────────────────
 interface RapidaCardProps {
     label: string
@@ -372,6 +455,9 @@ export default function IndicatorsPage() {
                                         ))}
                                     </div>
                                 </div>
+
+                                {/* Pareto de Defectos para Reparación Rápida */}
+                                <ParetoChart rows={rapidaResult.reparados} />
                             </div>
                         )}
                     </div>
@@ -389,6 +475,9 @@ export default function IndicatorsPage() {
                                     <div className="bg-white dark:bg-slate-900 border border-slate-200 p-6 rounded-2xl shadow-sm space-y-2"><Zap className="text-emerald-500" /><p className="text-3xl font-black text-emerald-600">{kpis.hasOps ? kpis.productividad.toFixed(1) : '—'}</p><p className="text-[9px] font-black uppercase text-slate-600">Productividad</p></div>
                                     <div className={`border p-6 rounded-2xl shadow-sm space-y-2 ${col.softBg} ${col.border}`}><activeCat.icon className={col.text} /><p className="text-sm font-black uppercase text-slate-700">{activeCat.label}</p><p className="text-[9px] font-black uppercase text-slate-500">Categoría activa</p></div>
                                 </div>
+
+                                {/* Pareto Chart Section */}
+                                <ParetoChart rows={stats.comprometidos} />
 
                                 <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
                                     <div className="xl:col-span-1 space-y-4">

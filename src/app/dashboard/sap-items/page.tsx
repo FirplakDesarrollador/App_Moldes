@@ -49,6 +49,15 @@ export default function SAPItemsPage() {
     // Filters
     const [search, setSearch]           = useState('')
     const [filterFrozen, setFilterFrozen] = useState<'all' | 'active' | 'inactive'>('all')
+    const [updatingId, setUpdatingId]     = useState<string | null>(null)
+    const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error', show: boolean }>({ message: '', type: 'success', show: false })
+
+    useEffect(() => {
+        if (notification.show) {
+            const timer = setTimeout(() => setNotification(prev => ({ ...prev, show: false })), 4000)
+            return () => clearTimeout(timer)
+        }
+    }, [notification.show])
 
     useEffect(() => {
         const stored = localStorage.getItem('moldapp_user')
@@ -74,6 +83,49 @@ export default function SAPItemsPage() {
         } catch (e: any) {
             setErrorMsg(e.message || 'Error de red')
             setStatus('error')
+        }
+    }
+
+    const handleUpdateStatus = async (item: SAPItem, newStatus: string) => {
+        const serial = item.InternalSerialNumber || item.MfrSerialNo || item.SerialNumber || item.IntrSerial || ''
+        if (!serial) return
+
+        setUpdatingId(serial)
+        try {
+            const res = await fetch('/api/sap-items/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    itemCode: item.ItemCode,
+                    serialNumber: serial,
+                    estado_sap: newStatus
+                })
+            })
+            const data = await res.json()
+            if (!res.ok || !data.success) {
+                const msg = data.error || 'Error al actualizar en SAP'
+                console.error('[SAP Update Error Details]:', data.details)
+                setNotification({ 
+                    message: `${msg}${data.details ? ' (Detalle: ' + JSON.stringify(data.details).substring(0, 50) + '...)' : ''}`, 
+                    type: 'error', 
+                    show: true 
+                })
+            } else {
+                setNotification({ message: 'Estado actualizado correctamente en SAP', type: 'success', show: true })
+                // Actualizar estado local
+                setItems(prev => prev.map(i => {
+                    const s = i.InternalSerialNumber || i.MfrSerialNo || i.SerialNumber || i.IntrSerial || ''
+                    if (s === serial) {
+                        return { ...i, U_ESTADO_MOLDE: newStatus, U_EstadoMolde: newStatus, U_Estado: newStatus, U_ESTADO: newStatus }
+                    }
+                    return i
+                }))
+            }
+        } catch (e: any) {
+            console.error('[SAP Update Network Error]:', e)
+            setNotification({ message: 'Error de red al conectar con el servidor', type: 'error', show: true })
+        } finally {
+            setUpdatingId(null)
         }
     }
 
@@ -281,10 +333,24 @@ export default function SAPItemsPage() {
                                                     </span>
                                                 </td>
 
-                                                <td className="py-4 px-5">
-                                                    <span className="text-[10px] font-medium text-slate-500 uppercase whitespace-nowrap">
-                                                        {estadoMolde}
-                                                    </span>
+                                                <td className="py-4 px-5 min-w-[180px]">
+                                                    {updatingId === (item.InternalSerialNumber || item.MfrSerialNo || item.SerialNumber || item.IntrSerial) ? (
+                                                        <div className="flex items-center gap-2 text-[10px] font-black text-blue-500 animate-pulse uppercase">
+                                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                                            Actualizando...
+                                                        </div>
+                                                    ) : (
+                                                        <select
+                                                            className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-[10px] font-black text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/30 w-full cursor-pointer hover:border-blue-300 transition-all appearance-none"
+                                                            value={estadoMolde === '—' ? '' : estadoMolde}
+                                                            onChange={(e) => handleUpdateStatus(item, e.target.value)}
+                                                        >
+                                                            <option value="" disabled>Seleccionar estado</option>
+                                                            <option value="ACTIVO">ACTIVO</option>
+                                                            <option value="EN REPARACIÓN">EN REPARACIÓN</option>
+                                                            <option value="BAJA">BAJA</option>
+                                                        </select>
+                                                    )}
                                                 </td>
                                             </tr>
                                         )})}
@@ -295,6 +361,19 @@ export default function SAPItemsPage() {
                     </div>
                 )}
             </main>
+
+            {/* Notification Toast */}
+            {notification.show && (
+                <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-5 duration-500`}>
+                    <div className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border backdrop-blur-md 
+                        ${notification.type === 'success' 
+                            ? 'bg-green-500/90 text-white border-green-400' 
+                            : 'bg-red-500/90 text-white border-red-400'}`}>
+                        {notification.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
+                        <p className="text-xs font-black uppercase tracking-widest">{notification.message}</p>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

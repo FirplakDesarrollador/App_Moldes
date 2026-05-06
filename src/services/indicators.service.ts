@@ -26,6 +26,7 @@ export interface MoldIndicatorRow {
     estado: string
     tipo_de_reparacion: string
     tipo: string
+    defectos: string
 }
 
 // ── IndicatorStats includes both data sets ────────────────────────────────────
@@ -71,6 +72,7 @@ function mapRow(m: BDMoldRaw): MoldIndicatorRow {
         estado:           m["ESTADO"]            || 'PROCESO',
         tipo_de_reparacion: m["Tipo de reparacion"] || '',
         tipo:             m["Tipo"]              || '',
+        defectos:         m["DEFECTOS A REPARAR"] || '',
     }
 }
 
@@ -272,7 +274,8 @@ export const indicatorsService = {
                 tipo_calculado: tipoCalculado,
                 fecha_entrada: r['FECHA ENTRADA'],
                 fecha_esperada: r['FECHA ESPERADA'],
-                fecha_entrega: r['FECHA ENTREGA']
+                fecha_entrega: r['FECHA ENTREGA'],
+                defectos: r['DEFECTOS A REPARAR'] || ''
             })
         }
 
