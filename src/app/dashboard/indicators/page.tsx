@@ -184,6 +184,7 @@ export default function IndicatorsPage() {
     const [rapidaResult, setRapidaResult]       = useState<RapidaKPIResult | null>(null)
     const [rapidaError, setRapidaError]         = useState<string | null>(null)
     const [showRapidaModal, setShowRapidaModal] = useState(false)
+    const [rapidaModalType, setRapidaModalType] = useState<'reparados' | 'esperados' | 'entregados'>('reparados')
 
     const isRapidaMode = selectedCat === 'REPARACION_RAPIDA'
 
@@ -431,9 +432,9 @@ export default function IndicatorsPage() {
                                 </div>
 
                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-                                    <RapidaCard label="Total Moldes Reparados" value={Math.round(rapidaResult.totalMoldesReparados).toString()} sub="Ponderado (Clic ver)" icon={<Package />} colorClass="text-amber-600" bgClass="bg-amber-50 dark:bg-amber-900/20 border-amber-200" onClick={() => setShowRapidaModal(true)} />
-                                    <RapidaCard label="Moldes Esperados" value={String(rapidaResult.moldesEsperados)} sub="F. ESPERADA en rango" icon={<CalendarDays />} colorClass="text-blue-600" bgClass="bg-blue-50" />
-                                    <RapidaCard label="Moldes Entregados" value={String(rapidaResult.moldesEntregados)} sub="En período comprometido" icon={<CheckCircle2 />} colorClass="text-green-600" bgClass="bg-green-50" />
+                                    <RapidaCard label="Total Moldes Reparados" value={Math.round(rapidaResult.totalMoldesReparados).toString()} sub="Ponderado (Clic ver)" icon={<Package />} colorClass="text-amber-600" bgClass="bg-amber-50 dark:bg-amber-900/20 border-amber-200" onClick={() => { setRapidaModalType('reparados'); setShowRapidaModal(true); }} />
+                                    <RapidaCard label="Moldes Esperados" value={String(rapidaResult.moldesEsperados)} sub="F. ESPERADA en rango (Ver)" icon={<CalendarDays />} colorClass="text-blue-600" bgClass="bg-blue-50 border-blue-200" onClick={() => { setRapidaModalType('esperados'); setShowRapidaModal(true); }} />
+                                    <RapidaCard label="Moldes Entregados" value={String(rapidaResult.moldesEntregados)} sub="En período (Ver)" icon={<CheckCircle2 />} colorClass="text-green-600" bgClass="bg-green-50 border-green-200" onClick={() => { setRapidaModalType('entregados'); setShowRapidaModal(true); }} />
                                     <RapidaCard label="Meta Total" value={String(rapidaResult.metaTotal)} sub={`24 × ${rapidaResult.numDays} días`} icon={<Target />} colorClass="text-slate-600" bgClass="bg-slate-50" />
                                     <RapidaCard label="Meta por Persona" value="3.4" sub="Valor referencia" icon={<TrendingUp />} colorClass="text-violet-600" bgClass="bg-violet-50" />
                                     <RapidaCard label="Total Operarios" value={String(rapidaResult.totalOperarios)} sub="Suma del período" icon={<Users />} colorClass="text-indigo-600" bgClass="bg-indigo-50" />
@@ -530,35 +531,64 @@ export default function IndicatorsPage() {
                         <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowRapidaModal(false)}></div>
                         <div className="relative bg-white dark:bg-slate-900 w-full max-w-[1400px] max-h-[90vh] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
                             <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                                <h3 className="text-sm font-black flex items-center gap-3"><BarChart3 className="w-5 h-5 text-amber-500" /> Detalle de Moldes Reparados <span className="px-3 py-1 text-[9px] font-black uppercase rounded-full border border-amber-200 text-amber-600 bg-amber-50">REPARACIÓN RÁPIDA</span></h3>
+                                <h3 className="text-sm font-black flex items-center gap-3">
+                                    {rapidaModalType === 'reparados' && <BarChart3 className="w-5 h-5 text-amber-500" />}
+                                    {rapidaModalType === 'esperados' && <CalendarDays className="w-5 h-5 text-blue-500" />}
+                                    {rapidaModalType === 'entregados' && <CheckCircle2 className="w-5 h-5 text-green-500" />}
+                                    Detalle de {rapidaModalType === 'reparados' ? 'Moldes Reparados' : rapidaModalType === 'esperados' ? 'Moldes Esperados' : 'Moldes Entregados'} 
+                                    <span className="px-3 py-1 text-[9px] font-black uppercase rounded-full border border-amber-200 text-amber-600 bg-amber-50 ml-2">REPARACIÓN RÁPIDA</span>
+                                </h3>
                                 <div className="flex items-center gap-4">
-                                    <span className="text-[9px] font-black text-slate-400 uppercase">Ponderado: {Math.round(rapidaResult.totalMoldesReparados)}</span>
+                                    {rapidaModalType === 'reparados' && (
+                                        <span className="text-[9px] font-black text-slate-400 uppercase">Ponderado: {Math.round(rapidaResult.totalMoldesReparados)}</span>
+                                    )}
                                     <button onClick={() => setShowRapidaModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X className="w-5 h-5 text-slate-400" /></button>
                                 </div>
                             </div>
                             <div className="overflow-x-auto flex-1">
                                 <table className="w-full text-left min-w-[1000px]">
                                     <thead className="sticky top-0 bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800">
-                                        <tr className="bg-slate-50 border-b border-slate-100">{['Molde', 'Ponderación', 'F. Ingreso', 'F. Esperada', 'F. Entrega', 'Estado', 'Cumplimiento'].map(h => (<th key={h} className="py-4 px-6 text-[9px] font-black text-slate-400 uppercase tracking-widest">{h}</th>))}</tr>
+                                        <tr className="bg-slate-50 border-b border-slate-100">{['Molde', 'Tipo/Ponderación', 'F. Ingreso', 'F. Esperada', 'F. Entrega', 'Estado', 'Cumplimiento'].map(h => (<th key={h} className="py-4 px-6 text-[9px] font-black text-slate-400 uppercase tracking-widest">{h}</th>))}</tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                        {rapidaResult.reparados.map((m, i) => {
+                                        {(rapidaModalType === 'reparados' ? rapidaResult.reparados : 
+                                          rapidaModalType === 'esperados' ? rapidaResult.esperadosList : 
+                                          rapidaResult.entregadosList).map((m, i) => {
                                             const cumple = m.fecha_entrega && m.fecha_esperada && m.fecha_entrega <= m.fecha_esperada
                                             const format = (d: string) => d ? new Date(d + 'T00:00:00').toLocaleDateString('es-CO') : '—'
+                                            const rowTitle = m.titulo || m.nombre_articulo
+                                            const rowCode = m.codigo || m.serial
+                                            const rowType = m.tipo_calculado || m.tipo || 'Rápida'
+                                            
                                             return (
-                                                <tr key={`rap-${m.id}-${i}`} className="hover:bg-slate-50/60 transition-colors">
-                                                    <td className="py-4 px-6"><div className="flex items-start gap-2"><span className="mt-1.5 w-2 h-2 rounded-full bg-amber-500"></span><div><p className="text-xs font-black text-slate-900 uppercase leading-normal">{m.titulo}</p><p className="text-[10px] font-mono text-slate-400">{m.codigo}</p></div></div></td>
-                                                    <td className="py-4 px-6"><span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border 
-                                                        ${m.tipo_calculado === 'MS' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 
-                                                          m.tipo_calculado === 'FV' ? 'bg-sky-50 text-sky-600 border-sky-200' : 
-                                                          m.tipo_calculado === 'Desmanchado MS' ? 'bg-orange-50 text-orange-600 border-orange-200' :
-                                                          m.tipo_calculado === 'Desmanchado FV' ? 'bg-amber-50 text-amber-600 border-amber-200' :
-                                                          'bg-slate-50 text-slate-600 border-slate-200'}`}>{m.tipo_calculado}</span></td>
+                                                <tr key={`rap-mod-${i}`} className="hover:bg-slate-50/60 transition-colors">
+                                                    <td className="py-4 px-6"><div className="flex items-start gap-2"><span className={`mt-1.5 w-2 h-2 rounded-full ${rapidaModalType === 'esperados' ? 'bg-blue-500' : 'bg-amber-500'}`}></span><div><p className="text-xs font-black text-slate-900 uppercase leading-normal">{rowTitle}</p><p className="text-[10px] font-mono text-slate-400">{rowCode}</p></div></div></td>
+                                                    <td className="py-4 px-6">
+                                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border 
+                                                            ${rowType.includes('MS') ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 
+                                                              rowType.includes('FV') ? 'bg-sky-50 text-sky-600 border-sky-200' : 
+                                                              'bg-slate-50 text-slate-600 border-slate-200'}`}>{rowType}</span>
+                                                    </td>
                                                     <td className="py-4 px-6 text-xs text-slate-500">{format(m.fecha_entrada)}</td>
                                                     <td className="py-4 px-6 text-xs text-slate-500">{format(m.fecha_esperada)}</td>
                                                     <td className="py-4 px-6 text-xs font-bold text-slate-700">{format(m.fecha_entrega)}</td>
-                                                    <td className="py-4 px-6"><span className="px-2 py-0.5 rounded-lg text-[8px] font-black bg-green-500/10 text-green-600 border border-green-500/20 uppercase">ENTREGADO</span></td>
-                                                    <td className="py-4 px-6">{cumple ? <div className="text-green-500 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /><span className="text-[9px] font-black uppercase">Cumple</span></div> : <div className="text-red-400 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" /><span className="text-[9px] font-black uppercase">No cumple</span></div>}</td>
+                                                    <td className="py-4 px-6">
+                                                        <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase border 
+                                                            ${(rapidaModalType === 'esperados') 
+                                                                ? 'bg-blue-50 text-blue-600 border-blue-200' 
+                                                                : 'bg-green-50 text-green-600 border-green-200'}`}>
+                                                            {rapidaModalType === 'esperados' ? 'COMPROMETIDO' : 'ENTREGADO'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-4 px-6">
+                                                        {rapidaModalType === 'esperados' ? (
+                                                            <div className="text-slate-400 flex items-center gap-1"><Loader2 className="w-3.5 h-3.5" /><span className="text-[9px] font-black uppercase">En proceso</span></div>
+                                                        ) : cumple ? (
+                                                            <div className="text-green-500 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /><span className="text-[9px] font-black uppercase">Cumple</span></div>
+                                                        ) : (
+                                                            <div className="text-red-400 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" /><span className="text-[9px] font-black uppercase">No cumple</span></div>
+                                                        )}
+                                                    </td>
                                                 </tr>
                                             )
                                         })}
@@ -566,7 +596,7 @@ export default function IndicatorsPage() {
                                 </table>
                             </div>
                             <div className="px-8 py-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                                <span>Total registros: {rapidaResult.reparados.length}</span>
+                                <span>Total registros: {(rapidaModalType === 'reparados' ? rapidaResult.reparados : rapidaModalType === 'esperados' ? rapidaResult.esperadosList : rapidaResult.entregadosList).length}</span>
                                 <span>Firplak S.A. - Indicadores</span>
                             </div>
                         </div>

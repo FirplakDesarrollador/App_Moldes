@@ -1,5 +1,11 @@
 // PV_MOLDES V2.4
 import { createClient } from '@/lib/supabase'
+import dayjs from 'dayjs'
+import isBetween from 'dayjs/plugin/isBetween'
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore'
+
+dayjs.extend(isBetween)
+dayjs.extend(isSameOrBefore)
 
 // ── Raw row from BD_moldes ────────────────────────────────────────────────────
 export interface BDMoldRaw {
@@ -59,6 +65,8 @@ export interface RapidaKPIResult {
     nivelServicio: number          // moldesEntregados / moldesEsperados
     productividadHH: number        // totalMoldesReparados / totalOperarios
     reparados: any[]               // Detailed list of repaired molds
+    esperadosList: any[]           // New: Detailed list of expected molds
+    entregadosList: any[]          // New: Detailed list of delivered (at time) molds
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -210,10 +218,11 @@ export const indicatorsService = {
         }
 
         // ── Moldes Reparados: Todo lo entregado en el rango (Productividad) ──
-        const reparadosEnRangoRaw = rows.filter((r: any) => {
-            const fe = r['FECHA ENTREGA']
-            // Solo importa que la fecha de entrega real esté en el rango
-            return fe && fe >= dateRange.start && fe <= dateRange.end
+        const reparadosEnRangoRaw = rows.filter(r => {
+            const fEntrega = r['FECHA ENTREGA']
+            const tipo = String(r['Tipo de reparacion'] || '').toUpperCase()
+            const status = (r['ESTADO'] || '').toString().toLowerCase()
+            return tipo.includes('RAPIDA') && fEntrega && status.includes('entrega') && dayjs(fEntrega).isBetween(dateRange.start, dateRange.end, 'day', '[]')
         })
 
         let countMS = 0
@@ -282,19 +291,22 @@ export const indicatorsService = {
         const totalMoldesReparados = weightedTotal
 
         // ── Moldes Esperados: FECHA ESPERADA in range ─────────────────────────
-        const moldesEsperados = rows.filter((r: any) => {
+        // ── Moldes Esperados: FECHA ESPERADA in range ─────────────────────────
+        const esperadosRows = rows.filter((r: any) => {
             const fes = r['FECHA ESPERADA']
-            return fes && fes >= dateRange.start && fes <= dateRange.end
-        }).length
+            return fes && dayjs(fes).isBetween(dateRange.start, dateRange.end, 'day', '[]')
+        })
+        const moldesEsperados = esperadosRows.length
 
         // ── Moldes Entregados: Comprometidos para este periodo Y ya entregados ──
-        const moldesEntregados = rows.filter((r: any) => {
+        const entregadosRows = rows.filter((r: any) => {
             const fe  = r['FECHA ENTREGA']
             const fes = r['FECHA ESPERADA']
             if (!fe || !fes) return false
 
-            return (fes >= dateRange.start && fes <= dateRange.end && fe <= dateRange.end)
-        }).length
+            return (dayjs(fes).isBetween(dateRange.start, dateRange.end, 'day', '[]') && dayjs(fe).isSameOrBefore(dayjs(dateRange.end), 'day'))
+        })
+        const moldesEntregados = entregadosRows.length
 
         // ── KPIs ──────────────────────────────────────────────────────────────
         const productividad   = metaTotal > 0     ? totalMoldesReparados / metaTotal    : 0
@@ -309,7 +321,9 @@ export const indicatorsService = {
             moldesEsperados, moldesEntregados,
             metaTotal, metaPorPersona, totalOperarios, numDays,
             productividad, nivelServicio, productividadHH,
-            reparados: reparadosFormatted
+            reparados: reparadosFormatted,
+            esperadosList: esperadosRows.map(mapRow),
+            entregadosList: entregadosRows.map(mapRow)
         }
     },
 
