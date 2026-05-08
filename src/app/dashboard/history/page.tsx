@@ -307,7 +307,7 @@ export default function RegistroMoldesPage() {
             defectos_a_reparar: '',
             fecha_entrada: today,
             fecha_esperada: today,
-            fecha_entrega: today,
+            fecha_entrega: '',
             estado: 'En reparacion',
             observaciones: '',
             responsable: '',
