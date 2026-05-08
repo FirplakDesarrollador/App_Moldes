@@ -498,6 +498,14 @@ export const moldsService = {
             "Modified By": record.usuario || record.modified_by
         }
 
+        // REGLA: La fecha de entrega debe ser NULL si el estado no es uno de los estados de "finalizado/entregado"
+        const estadoNorm = (record.estado || '').toLowerCase().trim();
+        const estadosConEntrega = ['entregado', 'activo', 'disponible', 'ok'];
+        
+        if (!estadosConEntrega.includes(estadoNorm)) {
+            dbRecord["FECHA ENTREGA"] = null;
+        }
+
         // 2. LÓGICA DE GUARDADO (Priorizar UPDATE si conocemos el ID o si el CODIGO MOLDE ya existe)
         let existingId = record.id;
 
@@ -556,7 +564,7 @@ export const moldsService = {
             defectos_a_reparar: record.defectos_a_reparar,
             fecha_entrada: record.fecha_entrada,
             fecha_esperada: record.fecha_esperada,
-            fecha_entrega: record.fecha_entrega,
+            fecha_entrega: dbRecord["FECHA ENTREGA"], // Usamos el valor ya procesado (que puede ser null)
             estado: record.estado,
             observaciones: record.observaciones,
             usuario: record.usuario,

@@ -29,6 +29,7 @@ export interface MoldIndicatorRow {
     nombre_articulo: string
     fecha_esperada: string | null
     fecha_entrega: string | null
+    fecha_entrada: string | null
     estado: string
     tipo_de_reparacion: string
     tipo: string
@@ -77,6 +78,7 @@ function mapRow(m: BDMoldRaw): MoldIndicatorRow {
         nombre_articulo:  m["Título"]            || '',
         fecha_esperada:   m["FECHA ESPERADA"]    ?? null,
         fecha_entrega:    m["FECHA ENTREGA"]     ?? null,
+        fecha_entrada:    m["FECHA ENTRADA"]     ?? null,
         estado:           m["ESTADO"]            || 'PROCESO',
         tipo_de_reparacion: m["Tipo de reparacion"] || '',
         tipo:             m["Tipo"]              || '',
@@ -123,13 +125,21 @@ function classifyDefecto(defectos: string | null): { desmanchado: boolean } {
 // ── Service ───────────────────────────────────────────────────────────────────
 export const indicatorsService = {
     /**
-     * Performs TWO independent queries for the general (Especial / Molde Nuevo / etc.) dashboard:
+     * Performs independent queries for the general dashboard:
      *   Set A – "comprometidos": FECHA ESPERADA in [start, end]
      *   Set B – "entregados":    FECHA ENTREGA  in [start, end]
+     *   Set C - "atrasadosPrevios": FECHA ESPERADA < start AND status active
      */
-    async getKPIs(dateRange: { start: string; end: string }): Promise<IndicatorStats> {
+    async getKPIs(dateRange: { start: string; end: string }): Promise<IndicatorStats & { atrasadosPrevios: MoldIndicatorRow[] }> {
         const supabase = createClient()
+        
+        const ACTIVE_STATES = [
+            'En reparación', 'En reparacion', 'EN REPARACION',
+            'En espera - Produccion', 'En espera - Producción', 'En espera produccion', 'EN ESPERA - PRODUCCION',
+            'En espera - Moldes', 'En espera - reparación', 'En espera moldes', 'EN ESPERA - MOLDES',
+        ]
 
+        // A. Comprometidos en el rango
         const { data: dataA, error: errA } = await supabase
             .from('BD_moldes')
             .select('*')
@@ -140,6 +150,7 @@ export const indicatorsService = {
 
         if (errA) { console.error('[Indicators] Error fetching comprometidos:', errA.message); throw errA }
 
+        // B. Entregados en el rango
         const { data: dataB, error: errB } = await supabase
             .from('BD_moldes')
             .select('*')
@@ -149,8 +160,19 @@ export const indicatorsService = {
 
         if (errB) { console.error('[Indicators] Error fetching entregados:', errB.message); throw errB }
 
-        const comprometidos = ((dataA || []) as BDMoldRaw[]).map(mapRow)
-        const entregados    = ((dataB || []) as BDMoldRaw[]).map(mapRow)
+        // C. Atrasados previos (Esperados antes del inicio y que sigan activos)
+        const { data: dataC, error: errC } = await supabase
+            .from('BD_moldes')
+            .select('*')
+            .lt('"FECHA ESPERADA"', dateRange.start)
+            .in('ESTADO', ACTIVE_STATES)
+
+        if (errC) { console.error('[Indicators] Error fetching atrasados previos:', errC.message); throw errC }
+
+        const comprometidos   = ((dataA || []) as BDMoldRaw[]).map(mapRow)
+        const entregados      = ((dataB || []) as BDMoldRaw[]).map(mapRow)
+        const atrasadosPrev   = ((dataC || []) as BDMoldRaw[]).map(mapRow)
+
         const totalComprometidas     = comprometidos.length
         const totalEntregadasATiempo = entregados.length
         const totalPendientes        = comprometidos.filter(r => !r.fecha_entrega).length
@@ -161,6 +183,7 @@ export const indicatorsService = {
         return {
             comprometidos,
             entregados,
+            atrasadosPrevios: atrasadosPrev,
             detalles: comprometidos,
             totalComprometidas,
             totalEntregadasATiempo,
@@ -170,13 +193,6 @@ export const indicatorsService = {
         }
     },
 
-    /**
-     * Reparación Rápida KPIs
-     * - Uses BD_moldes filtered by "Tipo de reparacion" Rapida/Rápida variants
-     * - Crosses with planta_moldes for MS/FV classification
-     * - Counts brillado/desmanchado separately with weighting
-     * - operariosPorDia: Record<'YYYY-MM-DD', number>
-     */
     async getRapidaKPIs(
         dateRange: { start: string; end: string },
         operariosPorDia: Record<string, number>
@@ -188,7 +204,6 @@ export const indicatorsService = {
         const metaTotal = 24 * numDays
         const metaPorPersona = 3.4
 
-        // ── Fetch all Rapida records (no date filter here – we filter in JS) ──
         const { data: allRapida, error: errRapida } = await supabase
             .from('BD_moldes')
             .select('"id", "Título", "CODIGO MOLDE", "DEFECTOS A REPARAR", "FECHA ENTRADA", "FECHA ESPERADA", "FECHA ENTREGA", "ESTADO", "Tipo de reparacion"')
@@ -201,15 +216,12 @@ export const indicatorsService = {
 
         const rows = (allRapida || []) as any[]
 
-        // ── Fetch planta_moldes with high limit to get all 1534+ rows ──────────
         const { data: plantaData } = await supabase
             .from('planta_moldes')
             .select('numero_de_serie, planta')
             .limit(5000)
 
-        // Helper to normalize serials (remove leading zeros and non-alphanum)
         const normalize = (s: string) => s.replace(/^0+/, '').replace(/[^A-Z0-9]/gi, '').toUpperCase()
-
         const plantaMap: Record<string, string> = {}
         for (const p of (plantaData || [])) {
             if (p.numero_de_serie && p.planta) {
@@ -217,12 +229,11 @@ export const indicatorsService = {
             }
         }
 
-        // ── Moldes Reparados: Todo lo entregado en el rango (Productividad) ──
         const reparadosEnRangoRaw = rows.filter(r => {
             const fEntrega = r['FECHA ENTREGA']
             const tipo = String(r['Tipo de reparacion'] || '').toUpperCase()
             const status = (r['ESTADO'] || '').toString().toLowerCase()
-            return tipo.includes('RAPIDA') && fEntrega && status.includes('entrega') && dayjs(fEntrega).isBetween(dateRange.start, dateRange.end, 'day', '[]')
+            return (tipo.includes('RAPIDA') || tipo.includes('RÁPIDA')) && fEntrega && status.includes('entrega') && dayjs(fEntrega).isBetween(dateRange.start, dateRange.end, 'day', '[]')
         })
 
         let countMS = 0
@@ -235,13 +246,10 @@ export const indicatorsService = {
 
         for (const r of reparadosEnRangoRaw) {
             const defectStr = (r['DEFECTOS A REPARAR'] || '').toLowerCase()
-            
-            // Si es un brillado, se ignora completamente según instrucción
             if (defectStr.includes('brill')) continue;
 
             const { desmanchado } = classifyDefecto(r['DEFECTOS A REPARAR'])
             let tipoCalculado = 'Otros'
-
             const serial = normalize(String(r['CODIGO MOLDE'] || ''))
             const plantaVal = plantaMap[serial] || ''
             const isMS = plantaVal.includes('MS')
@@ -254,13 +262,11 @@ export const indicatorsService = {
                     weightedTotal += 1 / 2
                     tipoCalculado = 'Desmanchado FV'
                 } else {
-                    // Default to MS weight (1/3) if MS or unknown
                     countDesmanchadoMS++
                     weightedTotal += 1 / 3
                     tipoCalculado = 'Desmanchado MS'
                 }
             } else {
-                // Regular: classify MS or FV
                 if (isMS) {
                     countMS++
                     weightedTotal += 1
@@ -289,26 +295,20 @@ export const indicatorsService = {
         }
 
         const totalMoldesReparados = weightedTotal
-
-        // ── Moldes Esperados: FECHA ESPERADA in range ─────────────────────────
-        // ── Moldes Esperados: FECHA ESPERADA in range ─────────────────────────
         const esperadosRows = rows.filter((r: any) => {
             const fes = r['FECHA ESPERADA']
             return fes && dayjs(fes).isBetween(dateRange.start, dateRange.end, 'day', '[]')
         })
         const moldesEsperados = esperadosRows.length
 
-        // ── Moldes Entregados: Comprometidos para este periodo Y ya entregados ──
         const entregadosRows = rows.filter((r: any) => {
             const fe  = r['FECHA ENTREGA']
             const fes = r['FECHA ESPERADA']
             if (!fe || !fes) return false
-
             return (dayjs(fes).isBetween(dateRange.start, dateRange.end, 'day', '[]') && dayjs(fe).isSameOrBefore(dayjs(dateRange.end), 'day'))
         })
         const moldesEntregados = entregadosRows.length
 
-        // ── KPIs ──────────────────────────────────────────────────────────────
         const productividad   = metaTotal > 0     ? totalMoldesReparados / metaTotal    : 0
         const nivelServicio   = moldesEsperados > 0 ? moldesEntregados / moldesEsperados : 0
         const productividadHH = totalOperarios > 0  ? totalMoldesReparados / totalOperarios : 0

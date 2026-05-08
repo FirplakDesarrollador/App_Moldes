@@ -307,10 +307,11 @@ export default function RegistroMoldesPage() {
             defectos_a_reparar: '',
             fecha_entrada: today,
             fecha_esperada: today,
+            fecha_entrega: today,
             estado: 'En reparacion',
             observaciones: '',
             responsable: '',
-            recibido: '',
+            recibido: today,
             tipo_de_reparacion: 'Rapida',
             tipo: 'Molde',
             usuario: user?.Nombre || 'Desconocido'

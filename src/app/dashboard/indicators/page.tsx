@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
     BarChart3, CheckCircle2, AlertCircle, Loader2, Target,
     Zap, Wrench, Package, Sparkles, CalendarDays, TrendingUp, ArrowRightCircle,
-    Users, Activity, Gauge, X
+    Users, Activity, Gauge, X, AlertTriangle
 } from 'lucide-react'
 import {
     indicatorsService, IndicatorStats, MoldIndicatorRow, RapidaKPIResult, getDatesInRange
@@ -168,7 +168,7 @@ export default function IndicatorsPage() {
     const [stats, setStats]     = useState<IndicatorStats | null>(null)
 
     const [dateRange, setDateRange] = useState({
-        start: new Date(new Date().setDate(1)).toISOString().split('T')[0],
+        start: new Date().toISOString().split('T')[0],
         end:   new Date().toISOString().split('T')[0],
     })
     const [selectedCat, setSelectedCat] = useState('Todos')
@@ -176,7 +176,7 @@ export default function IndicatorsPage() {
 
     // ── Rápida-specific state ─────────────────────────────────────────────────
     const [rapidaDateRange, setRapidaDateRange] = useState({
-        start: new Date(new Date().setDate(1)).toISOString().split('T')[0],
+        start: new Date().toISOString().split('T')[0],
         end:   new Date().toISOString().split('T')[0],
     })
     const [operariosPorDia, setOperariosPorDia] = useState<Record<string, number | ''>>({})
@@ -185,6 +185,7 @@ export default function IndicatorsPage() {
     const [rapidaError, setRapidaError]         = useState<string | null>(null)
     const [showRapidaModal, setShowRapidaModal] = useState(false)
     const [rapidaModalType, setRapidaModalType] = useState<'reparados' | 'esperados' | 'entregados'>('reparados')
+    const [showDelayedModal, setShowDelayedModal] = useState(false)
 
     const isRapidaMode = selectedCat === 'REPARACION_RAPIDA'
 
@@ -273,23 +274,50 @@ export default function IndicatorsPage() {
     }, [filteredComp, filteredEntr, numOperarios])
 
     const tableRows = useMemo((): TableRow[] => {
+        if (!stats) return []
         const compIds = new Set(filteredComp.map(r => r.id))
         const entrIds = new Set(filteredEntr.map(r => r.id))
         const result: TableRow[] = []
+        const today = new Date().toISOString().split('T')[0]
+
+        // A. Comprometidos en el rango
         filteredComp.forEach(r => {
             const inB    = entrIds.has(r.id)
-            const cumple = !!(r.fecha_entrega && r.fecha_esperada && r.fecha_entrega <= r.fecha_esperada)
+            const fEntre = r.fecha_entrega
+            const fEspe  = r.fecha_esperada
+
+            let cumple = true
+            if (fEntre && fEspe) {
+                cumple = fEntre <= fEspe
+            } else if (!fEntre && fEspe) {
+                cumple = today <= fEspe
+            }
             result.push({ ...r, tag: inB ? 'ambos' : 'comprometido', cumple })
         })
+
+        // B. Atrasados previos (los que vienen de periodos anteriores y siguen en reparación)
+        const filteredPrev = selectedCat === 'Todos' 
+            ? (stats as any).atrasadosPrevios || []
+            : ((stats as any).atrasadosPrevios || []).filter((r: any) => getCategory(r) === selectedCat)
+
+        filteredPrev.forEach((r: any) => {
+            if (!compIds.has(r.id)) {
+                // Por definición, un atrasado previo no cumple (ya pasó su fecha)
+                result.push({ ...r, tag: 'comprometido', cumple: false })
+            }
+        })
+
+        // C. Entregados (los que se entregaron en el rango pero no estaban comprometidos para este periodo)
         filteredEntr.forEach(r => {
             if (!compIds.has(r.id)) {
                 const cumple = !!(r.fecha_entrega && r.fecha_esperada && r.fecha_entrega <= r.fecha_esperada)
                 result.push({ ...r, tag: 'entregado', cumple })
             }
         })
+
         result.sort((a, b) => (a.fecha_esperada || '').localeCompare(b.fecha_esperada || ''))
         return result
-    }, [filteredComp, filteredEntr])
+    }, [filteredComp, filteredEntr, stats, selectedCat])
 
     const activeCat = CATEGORIES.find(c => c.key === selectedCat)!
     const col       = COLOR[activeCat.color]
@@ -478,7 +506,7 @@ export default function IndicatorsPage() {
                                 </div>
 
                                 {/* Pareto Chart Section */}
-                                <ParetoChart rows={stats.comprometidos} />
+                                {selectedCat === 'Todos' && <ParetoChart rows={stats.comprometidos} />}
 
                                 <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
                                     <div className="xl:col-span-1 space-y-4">
@@ -496,7 +524,23 @@ export default function IndicatorsPage() {
                                     </div>
 
                                     <div className="xl:col-span-3 bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
-                                        <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between"><h3 className="text-sm font-black flex items-center gap-3"><BarChart3 className="w-5 h-5 text-blue-500" /> Detalle del período <span className={`px-3 py-1 text-[9px] font-black uppercase rounded-full border ${col.border} ${col.text} ${col.softBg}`}>{activeCat.label}</span></h3></div>
+                                        <div className="px-8 py-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                            <h3 className="text-sm font-black flex items-center gap-3">
+                                                <BarChart3 className="w-5 h-5 text-blue-500" /> 
+                                                Detalle del período 
+                                                <span className={`px-3 py-1 text-[9px] font-black uppercase rounded-full border ${col.border} ${col.text} ${col.softBg}`}>{activeCat.label}</span>
+                                            </h3>
+                                            
+                                            {selectedCat === 'REPARACION_ESPECIAL' && (
+                                                <button 
+                                                    onClick={() => setShowDelayedModal(true)}
+                                                    className="flex items-center gap-2 px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white text-[10px] font-black uppercase rounded-xl transition-all shadow-lg shadow-red-500/20 active:scale-95"
+                                                >
+                                                    <AlertTriangle className="w-4 h-4" />
+                                                    Ver Moldes Atrasados
+                                                </button>
+                                            )}
+                                        </div>
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-left min-w-[800px]">
                                                 <thead><tr className="bg-slate-50 border-b border-slate-100">{['Molde', 'F. Esperada', 'F. Real Entrega', 'Estado', 'En período', 'Cumplimiento'].map(h => (<th key={h} className="py-4 px-6 text-[9px] font-black text-slate-400 uppercase tracking-widest">{h}</th>))}</tr></thead>
@@ -598,6 +642,76 @@ export default function IndicatorsPage() {
                             <div className="px-8 py-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center text-[9px] font-black text-slate-400 uppercase tracking-widest">
                                 <span>Total registros: {(rapidaModalType === 'reparados' ? rapidaResult.reparados : rapidaModalType === 'esperados' ? rapidaResult.esperadosList : rapidaResult.entregadosList).length}</span>
                                 <span>Firplak S.A. - Indicadores</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {/* ── MODAL MOLDES ATRASADOS (ESPECIAL) ── */}
+                {showDelayedModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowDelayedModal(false)}></div>
+                        <div className="relative bg-white dark:bg-slate-900 w-full max-w-[1200px] max-h-[90vh] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
+                            <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-red-50/50 dark:bg-red-900/10">
+                                <h3 className="text-sm font-black flex items-center gap-3 text-red-600">
+                                    <AlertTriangle className="w-5 h-5" />
+                                    Moldes Atrasados / Incumplidos
+                                    <span className="px-3 py-1 text-[9px] font-black uppercase rounded-full border border-red-200 text-red-600 bg-white ml-2">REPARACIÓN ESPECIAL</span>
+                                </h3>
+                                <button onClick={() => setShowDelayedModal(false)} className="p-2 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-full transition-colors"><X className="w-5 h-5 text-red-400" /></button>
+                            </div>
+                            <div className="overflow-x-auto flex-1 p-2">
+                                <table className="w-full text-left min-w-[900px]">
+                                    <thead className="sticky top-0 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 z-10">
+                                        <tr className="bg-slate-50 dark:bg-slate-950">
+                                            {['Molde / Código', 'Fecha Ingreso', 'Fecha Esperada', 'Fecha Real Entrega', 'Estado'].map(h => (
+                                                <th key={h} className="py-4 px-6 text-[9px] font-black text-slate-400 uppercase tracking-widest">{h}</th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                        {tableRows.filter(r => !r.cumple).length > 0 ? (
+                                            tableRows.filter(r => !r.cumple).map((m, i) => {
+                                                const format = (d: string | null) => d ? new Date(d + 'T00:00:00').toLocaleDateString('es-CO') : '---'
+                                                return (
+                                                    <tr key={`delay-mod-${i}`} className="hover:bg-red-50/20 transition-colors group">
+                                                        <td className="py-5 px-6">
+                                                            <div className="flex items-start gap-3">
+                                                                <div className="w-8 h-8 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
+                                                                    <AlertCircle className="w-4 h-4 text-red-500" />
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-xs font-black text-slate-900 dark:text-white uppercase leading-normal">{m.nombre_articulo}</p>
+                                                                    <p className="text-[10px] font-mono text-slate-400">{m.serial}</p>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-5 px-6 text-xs text-slate-500 font-medium">{format(m.fecha_entrada)}</td>
+                                                        <td className="py-5 px-6 text-xs text-red-500 font-bold">{format(m.fecha_esperada)}</td>
+                                                        <td className="py-5 px-6 text-xs font-black text-slate-700 dark:text-slate-300">
+                                                            {m.fecha_entrega ? format(m.fecha_entrega) : <span className="text-red-400/60 italic">SIN ENTREGAR</span>}
+                                                        </td>
+                                                        <td className="py-5 px-6">
+                                                            <span className="px-3 py-1 rounded-lg text-[9px] font-black bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 uppercase border border-slate-200 dark:border-slate-700">
+                                                                {m.estado}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={5} className="py-20 text-center">
+                                                    <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto mb-4 opacity-20" />
+                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No hay moldes atrasados en este período</p>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div className="px-8 py-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                <span>Total atrasados: {tableRows.filter(r => !r.cumple).length}</span>
+                                <span>Reporte de Incumplimiento - Firplak S.A.</span>
                             </div>
                         </div>
                     </div>

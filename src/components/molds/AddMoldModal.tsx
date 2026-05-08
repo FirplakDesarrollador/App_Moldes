@@ -36,8 +36,8 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
         Responsable: '',
         Tipo_de_reparacion: 'Rapida',
         Fecha_de_ingreso: new Date().toISOString().split('T')[0],
-        Fecha_esperada: '',
-        Fecha_de_entrega: '',
+        Fecha_esperada: new Date().toISOString().split('T')[0],
+        Fecha_de_entrega: new Date().toISOString().split('T')[0],
         Observaciones_reparacion: '',
         modificado_por: '',
         modified_at: ''

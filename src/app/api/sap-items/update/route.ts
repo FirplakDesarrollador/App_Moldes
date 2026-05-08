@@ -83,25 +83,37 @@ export async function POST(req: Request) {
         }
 
         // 2. Fetch the entity to get its unique identifier 
-        const filterQuery = `(SerialNumber eq '${serialNumber}' or MfrSerialNo eq '${serialNumber}') and ItemCode eq '${itemCode}'`;
-        const searchPath = `/SerialNumberDetails?$filter=${encodeURIComponent(filterQuery)}`;
+        // We prioritize SerialNumber search as ItemCode formats can vary between App and SAP
+        const filterQuery = `(SerialNumber eq '${serialNumber}' or MfrSerialNo eq '${serialNumber}')`;
+        const searchPath = `/SerialNumberDetails?$filter=${encodeURIComponent(filterQuery)}&$select=DocEntry,ItemCode,SerialNumber,MfrSerialNo`;
         
-        console.log('[SAP Update] Searching for record...', { url: `${baseUrl}${searchPath}` });
+        console.log('[SAP Update] Searching for record by serial...', { serialNumber, url: `${baseUrl}${searchPath}` });
 
         const fetchRes = await fetch(`${baseUrl}${searchPath}`, { headers, dispatcher: agent } as any)
         const fetchData = await fetchRes.json()
         
         if (!fetchRes.ok || !fetchData.value || fetchData.value.length === 0) {
-            console.error('[SAP Update] Record not found or error:', fetchRes.status, fetchData);
+            console.error('[SAP Update] Serial not found in SAP:', { serialNumber, status: fetchRes.status });
             return NextResponse.json({ 
                 success: false, 
-                error: 'El artículo o número de serie no existe en SAP.', 
+                error: `El número de serie '${serialNumber}' no existe en la base de datos de SAP.`, 
                 details: fetchData.error || 'No records found'
             }, { status: 404 })
         }
 
-        const entity = fetchData.value[0]
-        console.log('[SAP Update] Record found:', { DocEntry: entity.DocEntry, ItemCode: entity.ItemCode });
+        // If multiple records exist with same serial (unlikely but possible), try to match the provided itemCode
+        let entity = fetchData.value[0];
+        if (fetchData.value.length > 1 && itemCode) {
+            const exactMatch = fetchData.value.find((v: any) => v.ItemCode === itemCode);
+            if (exactMatch) {
+                entity = exactMatch;
+                console.log('[SAP Update] Multiple serials found, matched by ItemCode:', itemCode);
+            } else {
+                console.warn('[SAP Update] Multiple serials found, none matched ItemCode. Using first found:', entity.ItemCode);
+            }
+        }
+
+        console.log('[SAP Update] Target record identified:', { DocEntry: entity.DocEntry, ItemCode: entity.ItemCode, Serial: entity.SerialNumber });
 
         // Use the exact identified User-Defined Field
         const estadoMoldeKey = 'U_EstadoMolde';
