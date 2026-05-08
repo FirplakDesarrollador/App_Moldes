@@ -115,11 +115,12 @@ export function getDatesInRange(start: string, end: string): string[] {
 }
 
 /** Detect brillado/desmanchado from defectos string */
-function classifyDefecto(defectos: string | null): { desmanchado: boolean, brillado: boolean } {
+function classifyDefecto(defectos: string | null, tipoRep?: string | null): { desmanchado: boolean, brillado: boolean } {
     const d = (defectos || '').toLowerCase()
+    const t = (tipoRep || '').toLowerCase()
     return {
-        desmanchado: d.includes('desmanch'),
-        brillado: /\bbrillado\b/i.test(d),
+        desmanchado: d.includes('desmanch') || t.includes('desmanch'),
+        brillado: /\bbrillado\b/i.test(d) || /\bbrillado\b/i.test(t),
     }
 }
 
@@ -208,7 +209,7 @@ export const indicatorsService = {
         const { data: allRapida, error: errRapida } = await supabase
             .from('BD_moldes')
             .select('"id", "Título", "CODIGO MOLDE", "DEFECTOS A REPARAR", "FECHA ENTRADA", "FECHA ESPERADA", "FECHA ENTREGA", "ESTADO", "Tipo de reparacion"')
-            .or('"Tipo de reparacion".ilike.%rapida%,"Tipo de reparacion".ilike.%rápida%')
+            .or('"Tipo de reparacion".ilike.%rapida%,"Tipo de reparacion".ilike.%rápida%,"Tipo de reparacion".ilike.%desmanch%,"Tipo de reparacion".ilike.%brill%')
 
         if (errRapida) {
             console.error('[Indicators/Rapida] Error fetching BD_moldes:', errRapida.message)
@@ -234,7 +235,8 @@ export const indicatorsService = {
             const fEntrega = r['FECHA ENTREGA']
             const tipo = String(r['Tipo de reparacion'] || '').toUpperCase()
             const status = (r['ESTADO'] || '').toString().toLowerCase()
-            return (tipo.includes('RAPIDA') || tipo.includes('RÁPIDA')) && fEntrega && status.includes('entrega') && dayjs(fEntrega).isBetween(dateRange.start, dateRange.end, 'day', '[]')
+            const isTargetType = tipo.includes('RAPIDA') || tipo.includes('RÁPIDA') || tipo.includes('DESMANCH') || tipo.includes('BRILL')
+            return isTargetType && fEntrega && status.includes('entrega') && dayjs(fEntrega).isBetween(dateRange.start, dateRange.end, 'day', '[]')
         })
 
         let countMS = 0
@@ -246,7 +248,7 @@ export const indicatorsService = {
         const reparadosFormatted: any[] = []
 
         for (const r of reparadosEnRangoRaw) {
-            const { desmanchado, brillado } = classifyDefecto(r['DEFECTOS A REPARAR'])
+            const { desmanchado, brillado } = classifyDefecto(r['DEFECTOS A REPARAR'], r['Tipo de reparacion'])
             let tipoCalculado = 'Otros'
             const serial = normalize(String(r['CODIGO MOLDE'] || ''))
             const plantaVal = plantaMap[serial] || ''
