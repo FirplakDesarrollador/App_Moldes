@@ -115,10 +115,11 @@ export function getDatesInRange(start: string, end: string): string[] {
 }
 
 /** Detect brillado/desmanchado from defectos string */
-function classifyDefecto(defectos: string | null): { desmanchado: boolean } {
+function classifyDefecto(defectos: string | null): { desmanchado: boolean, brillado: boolean } {
     const d = (defectos || '').toLowerCase()
     return {
         desmanchado: d.includes('desmanch'),
+        brillado: /\bbrillado\b/i.test(d),
     }
 }
 
@@ -245,10 +246,7 @@ export const indicatorsService = {
         const reparadosFormatted: any[] = []
 
         for (const r of reparadosEnRangoRaw) {
-            const defectStr = (r['DEFECTOS A REPARAR'] || '').toLowerCase()
-            if (defectStr.includes('brill')) continue;
-
-            const { desmanchado } = classifyDefecto(r['DEFECTOS A REPARAR'])
+            const { desmanchado, brillado } = classifyDefecto(r['DEFECTOS A REPARAR'])
             let tipoCalculado = 'Otros'
             const serial = normalize(String(r['CODIGO MOLDE'] || ''))
             const plantaVal = plantaMap[serial] || ''
@@ -266,7 +264,11 @@ export const indicatorsService = {
                     weightedTotal += 1 / 3
                     tipoCalculado = 'Desmanchado MS'
                 }
+            } else if (brillado) {
+                weightedTotal += 0.5
+                tipoCalculado = 'Brillado'
             } else {
+                // Regular: classify MS or FV
                 if (isMS) {
                     countMS++
                     weightedTotal += 1
