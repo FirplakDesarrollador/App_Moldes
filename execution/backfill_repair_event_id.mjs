@@ -79,9 +79,12 @@ async function runBackfill() {
             keyToUuid.set(key, crypto.randomUUID());
         }
       }
-      // Only add to update list if it doesn't have the ID yet
-      if (!r.repair_event_id) {
+      // Only add to update list if it doesn't have the ID yet AND has a valid ID
+      if (!r.repair_event_id && r.id !== null) {
           eventGroups[key].push(r.id);
+      } else if (r.id === null) {
+          // Log or handle records with missing IDs
+          // console.warn(`Record found with NULL id. Key: ${key}`);
       }
     });
 
