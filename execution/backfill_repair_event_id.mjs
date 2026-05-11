@@ -4,26 +4,31 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+/**
+ * CONFIGURATION
+ */
+const DRY_RUN = true; // Default to true as requested
+const START_OFFSET = 0; // Allow resuming from a specific record
+const PAGE_SIZE = 500; 
+const TARGET_TABLE = 'base_datos_historico_moldes';
+const SYNC_TABLE = 'BD_moldes';
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-// Configuration
-const BATCH_SIZE = 500; // Records to fetch per request
-const UPDATE_BATCH_SIZE = 50; // Groups to update per request (to avoid URL length limits or timeouts)
-
+/**
+ * UTILS
+ */
 function normalize(val) {
   if (val === null || val === undefined) return '';
   let str = String(val).trim().toLowerCase().replace(/\s+/g, ' ');
-  // If it looks like a timestamp, just take the date part
   if (/^\d{4}-\d{2}-\d{2}/.test(str)) str = str.substring(0, 10);
   return str;
 }
 
 function getEventKey(r) {
-  // Key logic: Code + Entry Date + Type + Defects
-  // This defines a unique repair event in the system
   const c = r.codigo_molde || r["CODIGO MOLDE"];
   const fe = r.fecha_entrada || r["FECHA ENTRADA"];
   const tr = r.tipo_de_reparacion || r["Tipo de reparacion"];
@@ -33,172 +38,141 @@ function getEventKey(r) {
   return `${normalize(c)}|${normalize(fe)}|${normalize(tr)}|${normalize(dr)}`;
 }
 
-async function runBackfill() {
-  console.log('🚀 Starting Massive Backfill for repair_event_id...');
+/**
+ * Generates a deterministic UUID based on a string key.
+ * This allows us to process records in pages without keeping all IDs in memory,
+ * while ensuring that records with the same "event key" get the same ID.
+ */
+function generateDeterministicUUID(key) {
+  const hash = crypto.createHash('sha256').update(key).digest('hex');
+  // Format as UUID: 8-4-4-4-12
+  return [
+    hash.substring(0, 8),
+    hash.substring(8, 12),
+    hash.substring(12, 16),
+    hash.substring(16, 20),
+    hash.substring(20, 32)
+  ].join('-');
+}
+
+async function backfill() {
+  console.log('--------------------------------------------------');
+  console.log('🚀 MASSIVE BACKFILL V2 (Memory Efficient)');
+  console.log(`Dry Run: ${DRY_RUN}`);
+  console.log(`Start Offset: ${START_OFFSET}`);
   console.log('--------------------------------------------------');
 
-  try {
-    // 1. Fetch all historical records
-    console.log('1. Fetching all historical records...');
-    let histData = [];
-    let start = 0;
-    let hasMore = true;
+  let offset = START_OFFSET;
+  let totalProcessed = 0;
+  let totalUpdated = 0;
+  let errors = 0;
 
+  try {
+    let hasMore = true;
     while (hasMore) {
+      console.log(`\nFetching page at offset ${offset}...`);
       const { data, error } = await supabase
-        .from('base_datos_historico_moldes')
+        .from(TARGET_TABLE)
         .select('id, codigo_molde, fecha_entrada, tipo_de_reparacion, defectos_a_reparar, repair_event_id')
-        .range(start, start + BATCH_SIZE - 1);
+        .range(offset, offset + PAGE_SIZE - 1)
+        .order('id', { ascending: true });
 
       if (error) throw error;
-      if (data.length === 0) {
+      if (!data || data.length === 0) {
         hasMore = false;
-      } else {
-        histData = histData.concat(data);
-        start += BATCH_SIZE;
-        process.stdout.write(`Fetched ${histData.length} records...\r`);
+        break;
       }
-    }
-    console.log(`\n✅ Fetched ${histData.length} total records from history.`);
 
-    // 2. Group records by event key
-    console.log('\n2. Grouping records into events...');
-    const eventGroups = {};
-    const keyToUuid = new Map();
+      console.log(`Processing ${data.length} records...`);
+      
+      // Calculate deterministic IDs for all records with valid IDs
+      const updates = data
+        .filter(r => r.id !== null)
+        .map(r => {
+          const key = getEventKey(r);
+          if (!key) return null;
+          const targetId = generateDeterministicUUID(key);
+          
+          // Only update if it doesn't match the deterministic one (or is missing)
+          if (r.repair_event_id !== targetId) {
+            return { id: r.id, repair_event_id: targetId };
+          }
+          return null;
+        })
+        .filter(u => u !== null);
 
-    histData.forEach(r => {
-      const key = getEventKey(r);
-      if (!key) return;
-
-      if (!eventGroups[key]) {
-        eventGroups[key] = [];
-        // Use existing repair_event_id if available, otherwise generate new
-        if (r.repair_event_id) {
-            keyToUuid.set(key, r.repair_event_id);
-        } else if (!keyToUuid.has(key)) {
-            keyToUuid.set(key, crypto.randomUUID());
+      if (updates.length > 0) {
+        if (!DRY_RUN) {
+          // Perform updates in parallel chunks
+          const chunkSize = 20;
+          for (let i = 0; i < updates.length; i += chunkSize) {
+            const batch = updates.slice(i, i + chunkSize);
+            const promises = batch.map(u => 
+              supabase.from(TARGET_TABLE).update({ repair_event_id: u.repair_event_id }).eq('id', u.id)
+            );
+            const results = await Promise.all(promises);
+            results.forEach(res => { if (res.error) { console.error('Update Error:', res.error); errors++; } });
+            totalUpdated += batch.length;
+          }
+        } else {
+          console.log(`[DRY RUN] Would update/overwrite ${updates.length} records in ${TARGET_TABLE}`);
+          totalUpdated += updates.length;
         }
       }
-      // Only add to update list if it doesn't have the ID yet AND has a valid ID
-      if (!r.repair_event_id && r.id !== null) {
-          eventGroups[key].push(r.id);
-      } else if (r.id === null) {
-          // Log or handle records with missing IDs
-          // console.warn(`Record found with NULL id. Key: ${key}`);
+
+      totalProcessed += data.length;
+      offset += PAGE_SIZE;
+      
+      console.log(`Progress: Total Processed: ${totalProcessed} | Total Updates: ${totalUpdated} | Errors: ${errors}`);
+      
+      if (data.length < PAGE_SIZE) {
+        hasMore = false;
       }
-    });
-
-    const groupsToUpdate = Object.keys(eventGroups).filter(k => eventGroups[k].length > 0);
-    console.log(`✅ Identified ${groupsToUpdate.length} events needing updates.`);
-
-    // 3. Update History in batches
-    console.log('\n3. Updating historical records...');
-    let totalUpdatedHist = 0;
-    
-    for (let i = 0; i < groupsToUpdate.length; i += UPDATE_BATCH_SIZE) {
-      const batchKeys = groupsToUpdate.slice(i, i + UPDATE_BATCH_SIZE);
-      
-      // Update each group in the batch
-      // Note: Supabase doesn't support bulk update with different values per row easily in one call
-      // So we do them in parallel batches
-      const promises = batchKeys.map(key => {
-          const uuid = keyToUuid.get(key);
-          const ids = eventGroups[key];
-          return supabase
-            .from('base_datos_historico_moldes')
-            .update({ repair_event_id: uuid })
-            .in('id', ids)
-            .then(({ error }) => {
-                if (error) throw error;
-                return ids.length;
-            });
-      });
-
-      const results = await Promise.all(promises);
-      totalUpdatedHist += results.reduce((a, b) => a + b, 0);
-      
-      const progress = Math.min(100, ((i + batchKeys.length) / groupsToUpdate.length) * 100).toFixed(1);
-      process.stdout.write(`Progress: ${progress}% (${totalUpdatedHist} records updated)\r`);
     }
-    console.log(`\n✅ History update complete. Total rows updated: ${totalUpdatedHist}`);
 
-    // 4. Sync BD_moldes (Active records)
-    console.log('\n4. Syncing BD_moldes (Active records)...');
+    console.log('\n--------------------------------------------------');
+    console.log('✅ PHASE 1 COMPLETE: Historico Backfilled');
+    
+    // PHASE 2: SYNC BD_moldes
+    console.log('\nPHASE 2: Syncing BD_moldes...');
     const { data: bdData, error: bdError } = await supabase
-      .from('BD_moldes')
+      .from(SYNC_TABLE)
       .select('id, "CODIGO MOLDE", "FECHA ENTRADA", "Tipo de reparacion", "DEFECTOS A REPARAR", repair_event_id');
     
     if (bdError) throw bdError;
 
-    let totalUpdatedBD = 0;
+    let bdUpdates = 0;
     for (const r of bdData) {
       const key = getEventKey(r);
-      const targetUuid = keyToUuid.get(key);
-
-      if (targetUuid && r.repair_event_id !== targetUuid) {
-        const { error: upError } = await supabase
-          .from('BD_moldes')
-          .update({ repair_event_id: targetUuid })
-          .eq('id', r.id);
-        
-        if (upError) {
-          console.error(`Error updating BD_moldes record ${r.id}:`, upError.message);
+      if (!key) continue;
+      const targetId = generateDeterministicUUID(key);
+      
+      if (r.repair_event_id !== targetId) {
+        if (!DRY_RUN) {
+          const { error: upErr } = await supabase.from(SYNC_TABLE).update({ repair_event_id: targetId }).eq('id', r.id);
+          if (upErr) console.error(`Sync error for BD_moldes ID ${r.id}:`, upErr.message);
+          else bdUpdates++;
         } else {
-          totalUpdatedBD++;
+          bdUpdates++;
         }
       }
     }
-    console.log(`✅ BD_moldes sync complete. Total rows updated: ${totalUpdatedBD}`);
+    console.log(`[${DRY_RUN ? 'DRY RUN' : 'SUCCESS'}] BD_moldes synced: ${bdUpdates} records.`);
 
-    // 5. Final Validation
-    console.log('\n5. Final Validation Check...');
+    // FINAL VALIDATION
+    console.log('\nPHASE 3: Final Validation...');
+    const { count: finalNoId } = await supabase.from(TARGET_TABLE).select('id', { count: 'exact', head: true }).is('repair_event_id', null);
+    console.log(`Records remaining without ID in history: ${finalNoId}`);
     
-    const { count: withIdHist } = await supabase
-      .from('base_datos_historico_moldes')
-      .select('id', { count: 'exact', head: true })
-      .not('repair_event_id', 'is', null);
-
-    const { count: withoutIdHist } = await supabase
-      .from('base_datos_historico_moldes')
-      .select('id', { count: 'exact', head: true })
-      .is('repair_event_id', null);
-
-    const { count: withIdBD } = await supabase
-      .from('BD_moldes')
-      .select('id', { count: 'exact', head: true })
-      .not('repair_event_id', 'is', null);
-
-    const { count: withoutIdBD } = await supabase
-      .from('BD_moldes')
-      .select('id', { count: 'exact', head: true })
-      .is('repair_event_id', null);
-
     console.log('--------------------------------------------------');
-    console.log('📊 BACKFILL SUMMARY REPORT');
+    console.log('🏁 BACKFILL PROCESS FINISHED');
     console.log('--------------------------------------------------');
-    console.log(`Historical records with repair_event_id:    ${withIdHist}`);
-    console.log(`Historical records WITHOUT repair_event_id: ${withoutIdHist}`);
-    console.log(`BD_moldes records with repair_event_id:      ${withIdBD}`);
-    console.log(`BD_moldes records WITHOUT repair_event_id:   ${withoutIdBD}`);
-    console.log('--------------------------------------------------');
-    
-    if (withoutIdHist === 0) {
-      console.log('✅ SUCCESS: All historical records have been processed.');
-    } else {
-      console.log('⚠️ WARNING: Some historical records still missing IDs. Check logic.');
-    }
-
-    if (withoutIdBD === 0) {
-        console.log('✅ SUCCESS: All active records are synchronized.');
-    } else {
-        console.log('ℹ️ Note: Some active records might not have historical counterparts.');
-    }
 
   } catch (err) {
-    console.error('\n❌ CRITICAL ERROR DURING BACKFILL:');
+    console.error('\n❌ FATAL ERROR:');
     console.error(err.message || err);
     process.exit(1);
   }
 }
 
-runBackfill();
+backfill();
