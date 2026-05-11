@@ -1,4 +1,4 @@
-// PV_MOLDES V2.4
+// PV_MOLDES V2.4 - HISTORICAL DATA MIGRATION
 import { createClient } from '@/lib/supabase'
 import dayjs from 'dayjs'
 import isBetween from 'dayjs/plugin/isBetween'
@@ -7,19 +7,21 @@ import isSameOrBefore from 'dayjs/plugin/isSameOrBefore'
 dayjs.extend(isBetween)
 dayjs.extend(isSameOrBefore)
 
-// ── Raw row from BD_moldes ────────────────────────────────────────────────────
-export interface BDMoldRaw {
+// ── Historical Record Structure ──────────────────────────────────────────────
+export interface HistoricalMoldRaw {
     id: number
-    "Título": string | null
-    "CODIGO MOLDE": string | null
-    "FECHA ENTRADA": string | null
-    "FECHA ESPERADA": string | null
-    "FECHA ENTREGA": string | null
-    "ESTADO": string | null
-    "DEFECTOS A REPARAR": string | null
-    "Tipo de reparacion": string | null
-    "Tipo": string | null
-    "Responsable": string | null
+    titulo: string | null
+    codigo_molde: string | null
+    fecha_entrada: string | null
+    fecha_esperada: string | null
+    fecha_entrega: string | null
+    estado: string | null
+    defectos_a_reparar: string | null
+    tipo_de_reparacion: string | null
+    tipo: string | null
+    responsable: string | null
+    created?: string
+    repair_event_id?: string | null
 }
 
 // ── Normalised row for the UI ─────────────────────────────────────────────────
@@ -34,9 +36,10 @@ export interface MoldIndicatorRow {
     tipo_de_reparacion: string
     tipo: string
     defectos: string
+    responsable: string
 }
 
-// ── IndicatorStats includes both data sets ────────────────────────────────────
+// ── IndicatorStats ────────────────────────────────────────────────────────────
 export interface IndicatorStats {
     comprometidos: MoldIndicatorRow[]
     entregados: MoldIndicatorRow[]
@@ -50,39 +53,62 @@ export interface IndicatorStats {
 
 // ── Reparación Rápida KPI result ─────────────────────────────────────────────
 export interface RapidaKPIResult {
-    totalMoldesReparados: number   // weighted: MS+FV + brillados*0.5 + desmanchados*0.333
+    totalMoldesReparados: number
     countMS: number
     countFV: number
-    countDesmanchadoMS: number     // new: MS desmanchados (weight 1/3)
-    countDesmanchadoFV: number     // new: FV desmanchados (weight 1/2)
-    countDesmanchado: number       // total raw count (for compatibility)
-    moldesEsperados: number        // FECHA ESPERADA in range
-    moldesEntregados: number       // FECHA ENTREGA in range AND FECHA ESPERADA <= range end
-    metaTotal: number              // 24 × numDays
-    metaPorPersona: number         // fixed 3.4
-    totalOperarios: number         // sum of daily operators
+    countDesmanchadoMS: number
+    countDesmanchadoFV: number
+    countDesmanchado: number
+    moldesEsperados: number
+    moldesEntregados: number
+    metaTotal: number
+    metaPorPersona: number
+    totalOperarios: number
     numDays: number
-    productividad: number          // totalMoldesReparados / metaTotal
-    nivelServicio: number          // moldesEntregados / moldesEsperados
-    productividadHH: number        // totalMoldesReparados / totalOperarios
-    reparados: any[]               // Detailed list of repaired molds
-    esperadosList: any[]           // New: Detailed list of expected molds
-    entregadosList: any[]          // New: Detailed list of delivered (at time) molds
+    productividad: number
+    nivelServicio: number
+    productividadHH: number
+    reparados: any[]
+    esperadosList: any[]
+    entregadosList: any[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function mapRow(m: BDMoldRaw): MoldIndicatorRow {
+
+/**
+ * Deduplication Logic:
+ * Groups records by (codigo_molde + fecha_entrada + tipo_de_reparacion + defectos_a_reparar).
+ * For each group, only the record with the highest ID (most recent edit) is kept.
+ */
+function deduplicateHistoricalRecords(records: HistoricalMoldRaw[]): HistoricalMoldRaw[] {
+    const eventGroups: Record<string, HistoricalMoldRaw> = {}
+
+    records.forEach(r => {
+        // PRIORIDAD: repair_event_id. FALLBACK: Clave compuesta
+        const key = r.repair_event_id || 
+            `${(r.codigo_molde || '').trim().toUpperCase()}|${r.fecha_entrada}|${(r.tipo_de_reparacion || '').trim().toUpperCase()}|${(r.defectos_a_reparar || '').trim().toUpperCase()}`
+        
+        if (!eventGroups[key] || r.id > eventGroups[key].id) {
+            eventGroups[key] = r
+        }
+    })
+
+    return Object.values(eventGroups)
+}
+
+function mapHistoricalRow(m: HistoricalMoldRaw): MoldIndicatorRow {
     return {
         id:               m.id,
-        serial:           m["CODIGO MOLDE"]      || '',
-        nombre_articulo:  m["Título"]            || '',
-        fecha_esperada:   m["FECHA ESPERADA"]    ?? null,
-        fecha_entrega:    m["FECHA ENTREGA"]     ?? null,
-        fecha_entrada:    m["FECHA ENTRADA"]     ?? null,
-        estado:           m["ESTADO"]            || 'PROCESO',
-        tipo_de_reparacion: m["Tipo de reparacion"] || '',
-        tipo:             m["Tipo"]              || '',
-        defectos:         m["DEFECTOS A REPARAR"] || '',
+        serial:           m.codigo_molde         || '',
+        nombre_articulo:  m.titulo               || '',
+        fecha_esperada:   m.fecha_esperada       ?? null,
+        fecha_entrega:    m.fecha_entrega        ?? null,
+        fecha_entrada:    m.fecha_entrada        ?? null,
+        estado:           m.estado               || 'PROCESO',
+        tipo_de_reparacion: m.tipo_de_reparacion || '',
+        tipo:             m.tipo                 || '',
+        defectos:         m.defectos_a_reparar   || '',
+        responsable:      m.responsable          || '',
     }
 }
 
@@ -102,7 +128,6 @@ function calcCategoryBreakdown(rows: MoldIndicatorRow[]): Record<string, number>
     return cats
 }
 
-/** Generate all dates between start and end (inclusive), YYYY-MM-DD */
 export function getDatesInRange(start: string, end: string): string[] {
     const dates: string[] = []
     const cur = new Date(start + 'T00:00:00')
@@ -114,7 +139,6 @@ export function getDatesInRange(start: string, end: string): string[] {
     return dates
 }
 
-/** Detect brillado/desmanchado from defectos string */
 function classifyDefecto(defectos: string | null, tipoRep?: string | null): { desmanchado: boolean, brillado: boolean } {
     const d = (defectos || '').toLowerCase()
     const t = (tipoRep || '').toLowerCase()
@@ -127,10 +151,7 @@ function classifyDefecto(defectos: string | null, tipoRep?: string | null): { de
 // ── Service ───────────────────────────────────────────────────────────────────
 export const indicatorsService = {
     /**
-     * Performs independent queries for the general dashboard:
-     *   Set A – "comprometidos": FECHA ESPERADA in [start, end]
-     *   Set B – "entregados":    FECHA ENTREGA  in [start, end]
-     *   Set C - "atrasadosPrevios": FECHA ESPERADA < start AND status active
+     * MIGRATED TO base_datos_historico_moldes
      */
     async getKPIs(dateRange: { start: string; end: string }): Promise<IndicatorStats & { atrasadosPrevios: MoldIndicatorRow[] }> {
         const supabase = createClient()
@@ -141,44 +162,40 @@ export const indicatorsService = {
             'En espera - Moldes', 'En espera - reparación', 'En espera moldes', 'EN ESPERA - MOLDES',
         ]
 
-        // A. Comprometidos en el rango
-        const { data: dataA, error: errA } = await supabase
-            .from('BD_moldes')
+        // 1. Fetch data from historical table
+        // We fetch a slightly broader range to ensure we don't miss transitions, but deduplication handles it
+        const { data: allHistorical, error } = await supabase
+            .from('base_datos_historico_moldes')
             .select('*')
-            .not('"FECHA ESPERADA"', 'is', null)
-            .gte('"FECHA ESPERADA"', dateRange.start)
-            .lte('"FECHA ESPERADA"', dateRange.end)
-            .order('"FECHA ESPERADA"', { ascending: true })
+            .or(`fecha_esperada.gte.${dateRange.start},fecha_entrega.gte.${dateRange.start}`)
 
-        if (errA) { console.error('[Indicators] Error fetching comprometidos:', errA.message); throw errA }
+        if (error) throw error
 
-        // B. Entregados en el rango
-        const { data: dataB, error: errB } = await supabase
-            .from('BD_moldes')
-            .select('*')
-            .not('"FECHA ENTREGA"', 'is', null)
-            .gte('"FECHA ENTREGA"', dateRange.start)
-            .lte('"FECHA ENTREGA"', dateRange.end)
+        const deduplicated = deduplicateHistoricalRecords((allHistorical || []) as HistoricalMoldRaw[])
 
-        if (errB) { console.error('[Indicators] Error fetching entregados:', errB.message); throw errB }
+        // A. Comprometidos: FECHA ESPERADA in range
+        const comprometidosRaw = deduplicated.filter(r => 
+            r.fecha_esperada && r.fecha_esperada >= dateRange.start && r.fecha_esperada <= dateRange.end
+        )
 
-        // C. Atrasados previos (Esperados antes del inicio y que sigan activos)
-        const { data: dataC, error: errC } = await supabase
-            .from('BD_moldes')
-            .select('*')
-            .lt('"FECHA ESPERADA"', dateRange.start)
-            .in('ESTADO', ACTIVE_STATES)
+        // B. Entregados: FECHA ENTREGA in range
+        const entregadosRaw = deduplicated.filter(r => 
+            r.fecha_entrega && r.fecha_entrega >= dateRange.start && r.fecha_entrega <= dateRange.end
+        )
 
-        if (errC) { console.error('[Indicators] Error fetching atrasados previos:', errC.message); throw errC }
+        // C. Atrasados previos: Esperados antes del inicio y que sigan activos en el historial más reciente
+        const atrasadosRaw = deduplicated.filter(r => 
+            r.fecha_esperada && r.fecha_esperada < dateRange.start && ACTIVE_STATES.includes(r.estado || '')
+        )
 
-        const comprometidos   = ((dataA || []) as BDMoldRaw[]).map(mapRow)
-        const entregados      = ((dataB || []) as BDMoldRaw[]).map(mapRow)
-        const atrasadosPrev   = ((dataC || []) as BDMoldRaw[]).map(mapRow)
+        const comprometidos = comprometidosRaw.map(mapHistoricalRow)
+        const entregados = entregadosRaw.map(mapHistoricalRow)
+        const atrasadosPrev = atrasadosRaw.map(mapHistoricalRow)
 
-        const totalComprometidas     = comprometidos.length
+        const totalComprometidas = comprometidos.length
         const totalEntregadasATiempo = entregados.length
-        const totalPendientes        = comprometidos.filter(r => !r.fecha_entrega).length
-        const nivelServicio          = totalComprometidas > 0
+        const totalPendientes = comprometidos.filter(r => !r.fecha_entrega).length
+        const nivelServicio = totalComprometidas > 0
             ? (totalEntregadasATiempo / totalComprometidas) * 100
             : 0
 
@@ -195,6 +212,9 @@ export const indicatorsService = {
         }
     },
 
+    /**
+     * MIGRATED TO base_datos_historico_moldes
+     */
     async getRapidaKPIs(
         dateRange: { start: string; end: string },
         operariosPorDia: Record<string, number>
@@ -206,35 +226,38 @@ export const indicatorsService = {
         const metaTotal = 24 * numDays
         const metaPorPersona = 3.4
 
-        const { data: allRapida, error: errRapida } = await supabase
-            .from('BD_moldes')
-            .select('"id", "Título", "CODIGO MOLDE", "DEFECTOS A REPARAR", "FECHA ENTRADA", "FECHA ESPERADA", "FECHA ENTREGA", "ESTADO", "Tipo de reparacion"')
-            .or('"Tipo de reparacion".ilike.%rapida%,"Tipo de reparacion".ilike.%rápida%,"Tipo de reparacion".ilike.%desmanch%,"Tipo de reparacion".ilike.%brill%')
+        // 1. Fetch from Historical
+        const { data: rawHistory, error: errRapida } = await supabase
+            .from('base_datos_historico_moldes')
+            .select('*')
+            .or(`tipo_de_reparacion.ilike.%rapida%,tipo_de_reparacion.ilike.%rápida%,tipo_de_reparacion.ilike.%desmanch%,tipo_de_reparacion.ilike.%brill%`)
 
         if (errRapida) {
-            console.error('[Indicators/Rapida] Error fetching BD_moldes:', errRapida.message)
+            console.error('[Indicators/Rapida] Error fetching historical:', errRapida.message)
             throw errRapida
         }
 
-        const rows = (allRapida || []) as any[]
+        const deduplicated = deduplicateHistoricalRecords((rawHistory || []) as HistoricalMoldRaw[])
 
+        // 2. Load Plant Map (for MS/FV classification)
         const { data: plantaData } = await supabase
             .from('planta_moldes')
             .select('numero_de_serie, planta')
             .limit(5000)
 
-        const normalize = (s: string) => s.replace(/^0+/, '').replace(/[^A-Z0-9]/gi, '').toUpperCase()
+        const normalizeSerial = (s: string) => s.replace(/^0+/, '').replace(/[^A-Z0-9]/gi, '').toUpperCase()
         const plantaMap: Record<string, string> = {}
         for (const p of (plantaData || [])) {
             if (p.numero_de_serie && p.planta) {
-                plantaMap[normalize(String(p.numero_de_serie))] = String(p.planta).trim().toUpperCase()
+                plantaMap[normalizeSerial(String(p.numero_de_serie))] = String(p.planta).trim().toUpperCase()
             }
         }
 
-        const reparadosEnRangoRaw = rows.filter(r => {
-            const fEntrega = r['FECHA ENTREGA']
-            const tipo = String(r['Tipo de reparacion'] || '').toUpperCase()
-            const status = (r['ESTADO'] || '').toString().toLowerCase()
+        // 3. Process Reparados (Delivered in range)
+        const reparadosEnRangoRaw = deduplicated.filter(r => {
+            const fEntrega = r.fecha_entrega
+            const tipo = String(r.tipo_de_reparacion || '').toUpperCase()
+            const status = (r.estado || '').toString().toLowerCase()
             const isTargetType = tipo.includes('RAPIDA') || tipo.includes('RÁPIDA') || tipo.includes('DESMANCH') || tipo.includes('BRILL')
             return isTargetType && fEntrega && status.includes('entrega') && dayjs(fEntrega).isBetween(dateRange.start, dateRange.end, 'day', '[]')
         })
@@ -248,9 +271,9 @@ export const indicatorsService = {
         const reparadosFormatted: any[] = []
 
         for (const r of reparadosEnRangoRaw) {
-            const { desmanchado, brillado } = classifyDefecto(r['DEFECTOS A REPARAR'], r['Tipo de reparacion'])
+            const { desmanchado, brillado } = classifyDefecto(r.defectos_a_reparar, r.tipo_de_reparacion)
             let tipoCalculado = 'Otros'
-            const serial = normalize(String(r['CODIGO MOLDE'] || ''))
+            const serial = normalizeSerial(String(r.codigo_molde || ''))
             const plantaVal = plantaMap[serial] || ''
             const isMS = plantaVal.includes('MS')
             const isFV = plantaVal.includes('FV')
@@ -270,7 +293,6 @@ export const indicatorsService = {
                 weightedTotal += 0.5
                 tipoCalculado = 'Brillado'
             } else {
-                // Regular: classify MS or FV
                 if (isMS) {
                     countMS++
                     weightedTotal += 1
@@ -287,28 +309,32 @@ export const indicatorsService = {
 
             reparadosFormatted.push({
                 id: r.id,
-                codigo: r['CODIGO MOLDE'],
-                titulo: r['Título'],
-                tipo_reparacion: r['Tipo de reparacion'],
+                codigo: r.codigo_molde,
+                titulo: r.titulo,
+                tipo_reparacion: r.tipo_de_reparacion,
                 tipo_calculado: tipoCalculado,
-                fecha_entrada: r['FECHA ENTRADA'],
-                fecha_esperada: r['FECHA ESPERADA'],
-                fecha_entrega: r['FECHA ENTREGA'],
-                defectos: r['DEFECTOS A REPARAR'] || ''
+                fecha_entrada: r.fecha_entrada,
+                fecha_esperada: r.fecha_esperada,
+                fecha_entrega: r.fecha_entrega,
+                defectos: r.defectos_a_reparar || ''
             })
         }
 
         const totalMoldesReparados = weightedTotal
-        const esperadosRows = rows.filter((r: any) => {
-            const fes = r['FECHA ESPERADA']
+        
+        // 4. Esperados en Rango
+        const esperadosRows = deduplicated.filter(r => {
+            const fes = r.fecha_esperada
             return fes && dayjs(fes).isBetween(dateRange.start, dateRange.end, 'day', '[]')
         })
         const moldesEsperados = esperadosRows.length
 
-        const entregadosRows = rows.filter((r: any) => {
-            const fe  = r['FECHA ENTREGA']
-            const fes = r['FECHA ESPERADA']
-            if (!fe || !fes) return false
+        // 5. Entregados a Tiempo (Esperados en rango y entregados antes del fin del rango)
+        const entregadosRows = deduplicated.filter(r => {
+            const fe  = r.fecha_entrega
+            const fes = r.fecha_esperada
+            const status = (r.estado || '').toLowerCase()
+            if (!fe || !fes || !status.includes('entrega')) return false
             return (dayjs(fes).isBetween(dateRange.start, dateRange.end, 'day', '[]') && dayjs(fe).isSameOrBefore(dayjs(dateRange.end), 'day'))
         })
         const moldesEntregados = entregadosRows.length
@@ -326,8 +352,8 @@ export const indicatorsService = {
             metaTotal, metaPorPersona, totalOperarios, numDays,
             productividad, nivelServicio, productividadHH,
             reparados: reparadosFormatted,
-            esperadosList: esperadosRows.map(mapRow),
-            entregadosList: entregadosRows.map(mapRow)
+            esperadosList: esperadosRows.map(mapHistoricalRow),
+            entregadosList: entregadosRows.map(mapHistoricalRow)
         }
     },
 

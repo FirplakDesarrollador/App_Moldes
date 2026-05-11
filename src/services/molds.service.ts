@@ -20,6 +20,7 @@ export interface Mold {
     modificado_por?: string
     modified_at?: string
     Nombre?: string
+    repair_event_id?: string
 }
 
 export interface MoldActive {
@@ -39,6 +40,7 @@ export interface MoldActive {
     "Tipo de reparacion"?: string
     Created?: string
     Modified?: string
+    repair_event_id?: string
 }
 
 export const moldsService = {
@@ -498,6 +500,41 @@ export const moldsService = {
             "Modified By": record.usuario || record.modified_by
         }
 
+        // 1.1 GESTIÓN DE REPAIR_EVENT_ID
+        let repairEventId = record.repair_event_id;
+
+        if (isNew) {
+            // Caso Nuevo: Generar ID único
+            repairEventId = crypto.randomUUID();
+        } else {
+            // Caso Edición: Intentar recuperar ID existente
+            if (!repairEventId) {
+                // Buscar en el registro actual de BD_moldes
+                const { data: current } = await supabase
+                    .from('BD_moldes')
+                    .select('repair_event_id')
+                    .ilike('CODIGO MOLDE', codigoMolde)
+                    .limit(1);
+                
+                repairEventId = current?.[0]?.repair_event_id;
+
+                if (!repairEventId) {
+                    // Si aún no tiene (registro viejo), buscar en histórico por clave lógica antes de crear uno nuevo
+                    const { data: hist } = await supabase
+                        .from('base_datos_historico_moldes')
+                        .select('repair_event_id')
+                        .eq('codigo_molde', codigoMolde)
+                        .eq('fecha_entrada', record.fecha_entrada)
+                        .not('repair_event_id', 'is', null)
+                        .order('id', { ascending: false })
+                        .limit(1);
+                    
+                    repairEventId = hist?.[0]?.repair_event_id || crypto.randomUUID();
+                }
+            }
+        }
+        dbRecord.repair_event_id = repairEventId;
+
         // REGLA: La fecha de entrega debe ser NULL si el estado no es uno de los estados de "finalizado/entregado"
         const estadoNorm = (record.estado || '').toLowerCase().trim();
         const estadosConEntrega = ['entregado', 'activo', 'disponible', 'ok'];
@@ -572,7 +609,8 @@ export const moldsService = {
             created: new Date().toISOString().split('T')[0],
             responsable: record.responsable,
             tipo_de_reparacion: record.tipo_de_reparacion,
-            tipo: record.tipo
+            tipo: record.tipo,
+            repair_event_id: repairEventId
         }
         const { error: histError } = await supabase
             .from('base_datos_historico_moldes')
