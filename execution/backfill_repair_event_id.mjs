@@ -7,7 +7,7 @@ dotenv.config();
 /**
  * CONFIGURATION
  */
-const DRY_RUN = true; // Default to true as requested
+const DRY_RUN = false; // Default to true as requested
 const START_OFFSET = 0; // Allow resuming from a specific record
 const PAGE_SIZE = 500; 
 const TARGET_TABLE = 'base_datos_historico_moldes';

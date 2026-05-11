@@ -226,11 +226,12 @@ export const indicatorsService = {
         const metaTotal = 24 * numDays
         const metaPorPersona = 3.4
 
-        // 1. Fetch from Historical
+        // 1. Fetch from Historical with strict Date and Type filters
         const { data: rawHistory, error: errRapida } = await supabase
             .from('base_datos_historico_moldes')
             .select('*')
-            .or(`tipo_de_reparacion.ilike.%rapida%,tipo_de_reparacion.ilike.%rápida%,tipo_de_reparacion.ilike.%desmanch%,tipo_de_reparacion.ilike.%brill%`)
+            .or(`tipo_de_reparacion.ilike.%rapida%,tipo_de_reparacion.ilike.%rápida%,tipo_de_reparacion.ilike.%desmanch%,tipo_de_reparacion.ilike.%brill%,defectos_a_reparar.ilike.%rapida%,defectos_a_reparar.ilike.%rápida%,defectos_a_reparar.ilike.%desmanch%,defectos_a_reparar.ilike.%brill%`)
+            .or(`and(fecha_entrega.gte.${dateRange.start},fecha_entrega.lte.${dateRange.end}),and(fecha_esperada.gte.${dateRange.start},fecha_esperada.lte.${dateRange.end})`)
 
         if (errRapida) {
             console.error('[Indicators/Rapida] Error fetching historical:', errRapida.message)
@@ -258,7 +259,9 @@ export const indicatorsService = {
             const fEntrega = r.fecha_entrega
             const tipo = String(r.tipo_de_reparacion || '').toUpperCase()
             const status = (r.estado || '').toString().toLowerCase()
-            const isTargetType = tipo.includes('RAPIDA') || tipo.includes('RÁPIDA') || tipo.includes('DESMANCH') || tipo.includes('BRILL')
+            const defs = String(r.defectos_a_reparar || '').toUpperCase()
+            const isTargetType = tipo.includes('RAPIDA') || tipo.includes('RÁPIDA') || tipo.includes('DESMANCH') || tipo.includes('BRILL') || 
+                                 defs.includes('RAPIDA') || defs.includes('RÁPIDA') || defs.includes('DESMANCH') || defs.includes('BRILL')
             return isTargetType && fEntrega && status.includes('entrega') && dayjs(fEntrega).isBetween(dateRange.start, dateRange.end, 'day', '[]')
         })
 
