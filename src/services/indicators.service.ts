@@ -7,6 +7,20 @@ import isSameOrBefore from 'dayjs/plugin/isSameOrBefore'
 dayjs.extend(isBetween)
 dayjs.extend(isSameOrBefore)
 
+const ACTIVE_STATES = [
+    'En reparación',
+    'En reparacion',
+    'EN REPARACION',
+    'En espera - Produccion',
+    'En espera - Producción',
+    'En espera produccion',
+    'EN ESPERA - PRODUCCION',
+    'En espera - Moldes',
+    'En espera - reparación',
+    'En espera moldes',
+    'EN ESPERA - MOLDES',
+]
+
 // ── Historical Record Structure ──────────────────────────────────────────────
 export interface HistoricalMoldRaw {
     id: number
@@ -84,9 +98,13 @@ function deduplicateHistoricalRecords(records: HistoricalMoldRaw[]): HistoricalM
     const eventGroups: Record<string, HistoricalMoldRaw> = {}
 
     records.forEach(r => {
-        // PRIORIDAD: repair_event_id. FALLBACK: Clave compuesta
-        const key = r.repair_event_id || 
-            `${(r.codigo_molde || '').trim().toUpperCase()}|${r.fecha_entrada}|${(r.tipo_de_reparacion || '').trim().toUpperCase()}|${(r.defectos_a_reparar || '').trim().toUpperCase()}`
+        const norm = (s: string | null) => (s || '').trim().toUpperCase().replace(/,+$/, '').trim()
+        
+        // REGLA: Código + Fecha + Tipo (Ignoramos defectos para unificar ediciones de la misma reparación)
+        const logicalKey = `${norm(r.codigo_molde)}|${r.fecha_entrada}|${norm(r.tipo_de_reparacion)}`
+        
+        // PRIORIDAD: repair_event_id. FALLBACK: Clave lógica
+        const key = r.repair_event_id || logicalKey
         
         if (!eventGroups[key] || r.id > eventGroups[key].id) {
             eventGroups[key] = r
@@ -169,7 +187,10 @@ export const indicatorsService = {
             .select('*')
             .or(`fecha_esperada.gte.${dateRange.start},fecha_entrega.gte.${dateRange.start}`)
 
-        if (error) throw error
+        if (error) {
+            console.error('[Indicators/General] Error fetching historical:', error)
+            throw error
+        }
 
         const deduplicated = deduplicateHistoricalRecords((allHistorical || []) as HistoricalMoldRaw[])
 

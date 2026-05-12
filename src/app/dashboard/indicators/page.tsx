@@ -300,18 +300,28 @@ export default function IndicatorsPage() {
             ? (stats as any).atrasadosPrevios || []
             : ((stats as any).atrasadosPrevios || []).filter((r: any) => getCategory(r) === selectedCat)
 
+        const processedIds = new Set(result.map(r => r.id))
+
         filteredPrev.forEach((r: any) => {
-            if (!compIds.has(r.id)) {
-                // Por definición, un atrasado previo no cumple (ya pasó su fecha)
+            if (!processedIds.has(r.id)) {
+                // Si no estaba en comprometidos, lo agregamos
                 result.push({ ...r, tag: 'comprometido', cumple: false })
+                processedIds.add(r.id)
             }
         })
 
         // C. Entregados (los que se entregaron en el rango pero no estaban comprometidos para este periodo)
         filteredEntr.forEach(r => {
-            if (!compIds.has(r.id)) {
+            if (processedIds.has(r.id)) {
+                // Si ya estaba (como comprometido o atrasado), lo marcamos como 'ambos'
+                const idx = result.findIndex(x => x.id === r.id)
+                if (idx !== -1) {
+                    result[idx] = { ...result[idx], tag: 'ambos' }
+                }
+            } else {
                 const cumple = !!(r.fecha_entrega && r.fecha_esperada && r.fecha_entrega <= r.fecha_esperada)
                 result.push({ ...r, tag: 'entregado', cumple })
+                processedIds.add(r.id)
             }
         })
 
