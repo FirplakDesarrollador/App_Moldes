@@ -554,20 +554,21 @@ export const moldsService = {
 
         // 2. LÓGICA DE GUARDADO (Priorizar UPDATE si conocemos el ID o si el CODIGO MOLDE ya existe)
         let existingId = record.id;
-
-        // Si no tenemos ID (es nuevo) pero el código ya existe en BD_moldes, hacemos UPSERT
-        // Tomamos el registro MÁS RECIENTE para evitar actualizar duplicados viejos
+        // Regla: BD_moldes solo guarda el último registro por tipo (o dos si son tipos diferentes)
         if (!existingId || isNew) {
+            const tipoRep = record.tipo_reparacion || record["Tipo de reparacion"];
+            
             const { data: existingData } = await supabase
                 .from('BD_moldes')
                 .select('id')
                 .ilike('CODIGO MOLDE', codigoMolde)
+                .ilike('Tipo de reparacion', tipoRep) // Buscar específicamente el mismo tipo
                 .order('id', { ascending: false })
                 .limit(1)
-
+            
             if (existingData && existingData.length > 0) {
                 existingId = existingData[0].id;
-                console.log(`[saveRegistro] Molde detectado por código → UPSERT en ID: ${existingId}`);
+                console.log(`[saveRegistro] Molde/Tipo detectado → Actualizando registro existente ID: ${existingId}`);
             }
         }
 
