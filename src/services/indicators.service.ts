@@ -99,14 +99,24 @@ function deduplicateHistoricalRecords(records: HistoricalMoldRaw[]): HistoricalM
 
     records.forEach(r => {
         const norm = (s: string | null) => (s || '').trim().toUpperCase().replace(/,+$/, '').trim()
-        
-        // REGLA: Código + Fecha + Tipo (Ignoramos defectos para unificar ediciones de la misma reparación)
+
         const logicalKey = `${norm(r.codigo_molde)}|${r.fecha_entrada}|${norm(r.tipo_de_reparacion)}`
-        
-        // PRIORIDAD: repair_event_id. FALLBACK: Clave lógica
         const key = r.repair_event_id || logicalKey
-        
-        if (!eventGroups[key] || r.id > eventGroups[key].id) {
+
+        if (!eventGroups[key]) {
+            eventGroups[key] = r
+            return
+        }
+
+        const existing = eventGroups[key]
+        const rEntregado = !!r.fecha_entrega
+        const existingEntregado = !!existing.fecha_entrega
+
+        // Prioridad 1: preferir el registro con fecha_entrega (molde ya entregado)
+        // Prioridad 2: mismo status → conservar el de mayor ID (edición más reciente)
+        if (rEntregado && !existingEntregado) {
+            eventGroups[key] = r
+        } else if (rEntregado === existingEntregado && r.id > existing.id) {
             eventGroups[key] = r
         }
     })
@@ -213,8 +223,20 @@ export const indicatorsService = {
         const entregados = entregadosRaw.map(mapHistoricalRow)
         const atrasadosPrev = atrasadosRaw.map(mapHistoricalRow)
 
+        // Unificar para la lista de detalles: Comprometidos + Entregados fuera de fecha esperada
+        const todosMap: Record<string, MoldIndicatorRow> = {}
+        comprometidos.forEach(r => { todosMap[r.id] = r })
+        entregados.forEach(r => { todosMap[r.id] = r })
+        const detallesUnificados = Object.values(todosMap).sort((a,b) => 
+            (a.fecha_esperada || '').localeCompare(b.fecha_esperada || '')
+        )
+
         const totalComprometidas = comprometidos.length
-        const totalEntregadasATiempo = entregados.length
+        const totalEntregadasATiempo = entregados.filter(e => {
+            // Solo cuenta como "A tiempo" si se entregó en el rango Y estaba comprometida
+            return comprometidos.some(c => c.id === e.id)
+        }).length
+        
         const totalPendientes = comprometidos.filter(r => !r.fecha_entrega).length
         const nivelServicio = totalComprometidas > 0
             ? (totalEntregadasATiempo / totalComprometidas) * 100
@@ -224,12 +246,12 @@ export const indicatorsService = {
             comprometidos,
             entregados,
             atrasadosPrevios: atrasadosPrev,
-            detalles: comprometidos,
+            detalles: detallesUnificados,
             totalComprometidas,
             totalEntregadasATiempo,
             totalPendientes,
             nivelServicio,
-            desglosePorCategoria: calcCategoryBreakdown(comprometidos),
+            desglosePorCategoria: calcCategoryBreakdown(detallesUnificados),
         }
     },
 
