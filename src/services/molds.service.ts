@@ -412,7 +412,7 @@ export const moldsService = {
         // PRIORIDAD 2: Mapeo por ESTADO
         let estadoDestino: string
         if (defectoNorm.includes('limite') && defectoNorm.includes('vueltas')) {
-            estadoDestino = 'En reparacion'
+            estadoDestino = 'Por desmanchar'
         } else if (estadoNorm.includes('entregado')) {
             estadoDestino = 'Disponible'
         } else if (

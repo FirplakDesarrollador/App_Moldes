@@ -2,31 +2,40 @@
 -- TRIGGER SQL: Sincronización automática BD_moldes → moldes
 -- ============================================================
 --
--- PROPÓSITO:
---   Cada vez que se inserta o actualiza un registro en BD_moldes,
---   este trigger actualiza el campo 'estado' en la tabla maestra 'moldes'
---   usando el mapeo de negocio definido.
---
 -- MAPEO DE ESTADO:
---   BD_moldes.ESTADO / DEFECTOS A REPARAR  → moldes.estado
---   ──────────────────────────────────────   ─────────────────────
---   'Límite de vueltas alcanzado' (defecto) → 'En reparacion'  ← PRIORIDAD
---   'En reparacion' (variantes)             → 'En reparacion'
---   'En espera - Moldes'                    → 'En reparacion'
---   'En espera - Produccion'                → 'En reparacion'
---   'Entregado'                             → 'Disponible'
---   'Destruido'                             → 'Destruido'
---   Cualquier otro                          → No hace nada (seguro)
+--   BD_moldes.DEFECTOS A REPARAR / ESTADO    → moldes.estado
+--   ──────────────────────────────────────     ──────────────────────
+--   'Límite de vueltas alcanzado' (defecto)  → 'Por desmanchar'  ← PRIORIDAD
+--   'En reparacion' (variantes)              → 'En reparacion'
+--   'En espera - Moldes/Produccion'          → 'En reparacion'
+--   'Entregado'                              → 'Disponible'
+--   'Destruido'                              → 'Destruido'
+--   Cualquier otro                           → No hace nada (seguro)
 --
 -- CÓMO EJECUTAR:
 --   1. Ir a Supabase → SQL Editor
 --   2. Pegar este script completo
 --   3. Ejecutar (Run)
---   El trigger quedará activo permanentemente.
 -- ============================================================
 
 
--- ── PASO 1: Función del trigger ──────────────────────────────
+-- ── PASO 1: Agregar 'Por desmanchar' al enum si no existe ────
+-- (seguro ejecutar aunque ya exista)
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_enum
+        WHERE enumtypid = 'public.estado_molde_type'::regtype
+          AND enumlabel = 'Por desmanchar'
+    ) THEN
+        ALTER TYPE public.estado_molde_type ADD VALUE 'Por desmanchar';
+    END IF;
+END
+$$;
+
+
+-- ── PASO 2: Función del trigger ──────────────────────────────
 
 CREATE OR REPLACE FUNCTION sync_moldes_estado()
 RETURNS TRIGGER
@@ -38,15 +47,14 @@ DECLARE
     v_defecto_bd     TEXT;
     v_estado_destino TEXT;
 BEGIN
-    -- Obtener código, estado y defecto del registro nuevo/modificado
     v_codigo_molde := TRIM(NEW."CODIGO MOLDE");
     v_estado_bd    := LOWER(TRIM(COALESCE(NEW."ESTADO", '')));
     v_defecto_bd   := LOWER(TRIM(COALESCE(NEW."DEFECTOS A REPARAR", '')));
 
-    -- PRIORIDAD 1: Defecto "Límite de vueltas alcanzado" → siempre En reparacion
+    -- PRIORIDAD 1: Defecto "Límite de vueltas alcanzado" → Por desmanchar
     IF v_defecto_bd ILIKE '%limite%vueltas%'
     OR v_defecto_bd ILIKE '%límite%vueltas%' THEN
-        v_estado_destino := 'En reparacion';
+        v_estado_destino := 'Por desmanchar';
 
     -- PRIORIDAD 2: Mapeo por ESTADO
     ELSIF v_estado_bd ILIKE '%entregado%' THEN
@@ -61,18 +69,15 @@ BEGIN
         v_estado_destino := 'Destruido';
 
     ELSE
-        -- Estado no mapeado: no hacer nada, preservar integridad
         RETURN NEW;
     END IF;
 
-    -- Actualizar tabla maestra 'moldes' si el código existe
     -- Cast explícito a estado_molde_type porque moldes.estado es un enum
     UPDATE public.moldes
     SET    estado = v_estado_destino::estado_molde_type
     WHERE  LOWER(TRIM(serial)) = LOWER(v_codigo_molde)
       AND  estado <> v_estado_destino::estado_molde_type;
 
-    -- Log en consola de Postgres (visible en Supabase Logs)
     IF FOUND THEN
         RAISE LOG '[sync_moldes_estado] % → moldes.estado = "%" (defecto: "%")',
             v_codigo_molde, v_estado_destino, NEW."DEFECTOS A REPARAR";
@@ -83,13 +88,9 @@ END;
 $$;
 
 
--- ── PASO 2: Eliminar trigger anterior si existía ─────────────
+-- ── PASO 3: Eliminar trigger anterior y recrear ──────────────
 
 DROP TRIGGER IF EXISTS trg_sync_moldes_estado ON public."BD_moldes";
-
-
--- ── PASO 3: Crear el trigger en BD_moldes ───────────────────
--- Ahora escucha también cambios en "DEFECTOS A REPARAR"
 
 CREATE TRIGGER trg_sync_moldes_estado
 AFTER INSERT OR UPDATE OF "ESTADO", "DEFECTOS A REPARAR"
@@ -98,15 +99,15 @@ FOR EACH ROW
 EXECUTE FUNCTION sync_moldes_estado();
 
 
--- ── PASO 4: Forzar sincronización de moldes con "Límite de vueltas" activos ──
--- Aplica el estado correcto a moldes que ya tienen ese defecto en BD_moldes
+-- ── PASO 4: Sincronizar moldes existentes con "Límite de vueltas" ──
 
 UPDATE public.moldes m
-SET    estado = 'En reparacion'::estado_molde_type
+SET    estado = 'Por desmanchar'::estado_molde_type
 FROM   public."BD_moldes" b
 WHERE  LOWER(TRIM(m.serial)) = LOWER(TRIM(b."CODIGO MOLDE"))
-  AND  b."DEFECTOS A REPARAR" ILIKE '%limite%vueltas%'
-  AND  m.estado <> 'En reparacion'::estado_molde_type;
+  AND  (b."DEFECTOS A REPARAR" ILIKE '%limite%vueltas%'
+     OR b."DEFECTOS A REPARAR" ILIKE '%límite%vueltas%')
+  AND  m.estado <> 'Por desmanchar'::estado_molde_type;
 
 
 -- ── VALIDACIÓN MANUAL ────────────────────────────────────────
@@ -117,7 +118,8 @@ SELECT
     b."DEFECTOS A REPARAR"  AS defecto,
     m.estado                AS moldes_estado,
     CASE
-        WHEN b."DEFECTOS A REPARAR" ILIKE '%limite%vueltas%' AND m.estado = 'En reparacion' THEN '✅ OK'
+        WHEN (b."DEFECTOS A REPARAR" ILIKE '%limite%vueltas%')
+             AND m.estado = 'Por desmanchar' THEN '✅ OK'
         WHEN b."ESTADO" ILIKE '%reparacion%' AND m.estado = 'En reparacion' THEN '✅ OK'
         WHEN b."ESTADO" ILIKE '%entregado%'  AND m.estado = 'Disponible'    THEN '✅ OK'
         ELSE '❌ DESINCRONIZADO'
@@ -125,5 +127,5 @@ SELECT
 FROM public."BD_moldes" b
 JOIN public.moldes m ON LOWER(TRIM(m.serial)) = LOWER(TRIM(b."CODIGO MOLDE"))
 WHERE b."DEFECTOS A REPARAR" ILIKE '%limite%vueltas%'
-   OR b."CODIGO MOLDE" IN ('0124-49');
+ORDER BY b."CODIGO MOLDE";
 */
