@@ -331,6 +331,7 @@ export const moldsService = {
             .from('BD_moldes')
             .select('*')
             .order('"FECHA ENTRADA"', { ascending: false, nullsFirst: false })
+            .order('id', { ascending: false })
 
         if (search.trim()) {
             const term = `%${search.trim()}%`
@@ -356,8 +357,17 @@ export const moldsService = {
             console.error('Error fetching BD_moldes:', error)
             return []
         }
-        
-        return (data || []).map((m: any) => ({
+
+        // Deduplicar: si BD_moldes tiene varias filas por código, conservar solo la más reciente
+        const seen = new Set<string>()
+        const deduped = (data || []).filter((m: any) => {
+            const key = (m["CODIGO MOLDE"] || '').trim().toUpperCase()
+            if (seen.has(key)) return false
+            seen.add(key)
+            return true
+        })
+
+        return deduped.map((m: any) => ({
             ...m,
             titulo: m["Título"],
             codigo_molde: m["CODIGO MOLDE"],
@@ -547,13 +557,15 @@ export const moldsService = {
         let existingId = record.id;
 
         // Si no tenemos ID (es nuevo) pero el código ya existe en BD_moldes, hacemos UPSERT
+        // Tomamos el registro MÁS RECIENTE para evitar actualizar duplicados viejos
         if (!existingId || isNew) {
             const { data: existingData } = await supabase
                 .from('BD_moldes')
                 .select('id')
                 .ilike('CODIGO MOLDE', codigoMolde)
+                .order('id', { ascending: false })
                 .limit(1)
-            
+
             if (existingData && existingData.length > 0) {
                 existingId = existingData[0].id;
                 console.log(`[saveRegistro] Molde detectado por código → UPSERT en ID: ${existingId}`);

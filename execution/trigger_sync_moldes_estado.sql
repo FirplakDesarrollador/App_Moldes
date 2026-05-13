@@ -58,10 +58,11 @@ BEGIN
     END IF;
 
     -- Actualizar tabla maestra 'moldes' si el código existe
+    -- Cast explícito a estado_molde_type porque moldes.estado es un enum
     UPDATE public.moldes
-    SET    estado = v_estado_destino
+    SET    estado = v_estado_destino::estado_molde_type
     WHERE  LOWER(TRIM(serial)) = LOWER(v_codigo_molde)
-      AND  estado <> v_estado_destino;  -- Solo si realmente cambió (evita writes innecesarios)
+      AND  estado <> v_estado_destino::estado_molde_type;
 
     -- Log en consola de Postgres (visible en Supabase Logs)
     IF FOUND THEN
