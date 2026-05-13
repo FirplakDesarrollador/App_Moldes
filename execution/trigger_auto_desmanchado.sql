@@ -2,29 +2,26 @@
 -- TRIGGER SQL: Auto-desmanchado moldes → BD_moldes
 -- ============================================================
 --
--- PROPÓSITO:
---   Cuando vueltas_actuales en 'moldes' alcanza un múltiplo de
---   vueltas_desmanchado, inserta automáticamente un registro en
---   BD_moldes con ESTADO = 'En reparacion' y DEFECTO = 'Desmanchado'.
---   Esto dispara el trigger trg_sync_moldes_estado que actualiza
---   moldes.estado = 'En reparacion'.
+-- REGLA DE NEGOCIO:
+--   Cada molde tiene un umbral en moldes.vueltas_desmanchado.
+--   Cuando moldes.vueltas_actuales alcanza un múltiplo de ese umbral,
+--   el molde sale automáticamente a desmanchar:
+--     1. Se inserta un registro en BD_moldes con:
+--          ESTADO             = 'En reparacion'
+--          DEFECTOS A REPARAR = 'Desmanchado'
+--          Tipo de reparacion = 'Reparacion rapida'
+--     2. El trigger trg_sync_moldes_estado detecta 'Desmanchado' en
+--        DEFECTOS A REPARAR y actualiza moldes.estado = 'Por desmanchar'
 --
 -- CONDICIÓN DE DISPARO:
---   - vueltas_desmanchado > 0 (la funcionalidad está activa para ese molde)
+--   - vueltas_desmanchado > 0  (molde tiene umbral configurado)
 --   - vueltas_actuales > 0
---   - vueltas_actuales % vueltas_desmanchado = 0  (múltiplo: cada N vueltas)
---   - estado actual NO es 'En reparacion' ni 'Destruido' (evita duplicados)
---
--- FLUJO COMPLETO:
---   1. Sistema incrementa moldes.vueltas_actuales
---   2. Este trigger detecta condición de desmanchado
---   3. Inserta en BD_moldes (ESTADO='En reparacion', DEFECTO='Desmanchado')
---   4. trg_sync_moldes_estado (trigger existente) actualiza moldes.estado
+--   - vueltas_actuales % vueltas_desmanchado = 0  (cada N vueltas)
+--   - estado NO es 'Por desmanchar', 'En reparacion' ni 'Destruido'
 --
 -- CÓMO EJECUTAR:
---   1. Ir a Supabase → SQL Editor
---   2. Pegar este script completo
---   3. Ejecutar (Run)
+--   Supabase → SQL Editor → pegar todo → Run
+--   (Ejecutar DESPUÉS de trigger_sync_moldes_estado.sql)
 -- ============================================================
 
 
@@ -35,26 +32,28 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 DECLARE
-    v_vueltas_desmanch  INTEGER;
+    v_umbral INTEGER;
 BEGIN
-    -- Leer el umbral de desmanchado del molde
-    v_vueltas_desmanch := NEW.vueltas_desmanchado;
+    v_umbral := NEW.vueltas_desmanchado;
 
-    -- Condición: umbral activo, vueltas > 0, múltiplo exacto, estado no bloqueante
-    IF v_vueltas_desmanch IS NULL
-       OR v_vueltas_desmanch <= 0
-       OR NEW.vueltas_actuales IS NULL
-       OR NEW.vueltas_actuales <= 0
-       OR (NEW.vueltas_actuales % v_vueltas_desmanch) <> 0 THEN
+    -- Guardia: umbral no configurado o vueltas inválidas
+    IF v_umbral IS NULL OR v_umbral <= 0
+       OR NEW.vueltas_actuales IS NULL OR NEW.vueltas_actuales <= 0 THEN
         RETURN NEW;
     END IF;
 
-    -- Evitar insertar si el molde ya está en reparación o destruido
-    IF NEW.estado::text IN ('En reparacion', 'Destruido') THEN
+    -- Guardia: condición de múltiplo no cumplida
+    IF (NEW.vueltas_actuales % v_umbral) <> 0 THEN
         RETURN NEW;
     END IF;
 
-    -- Insertar registro en BD_moldes para activar el flujo de desmanchado
+    -- Guardia: molde ya está pendiente o en proceso
+    IF NEW.estado::text IN ('Por desmanchar', 'En reparacion', 'Destruido') THEN
+        RETURN NEW;
+    END IF;
+
+    -- Insertar en BD_moldes — el defecto 'Desmanchado' activa trg_sync_moldes_estado
+    -- que a su vez actualiza moldes.estado = 'Por desmanchar'
     INSERT INTO public."BD_moldes" (
         id,
         "Título",
@@ -74,7 +73,7 @@ BEGIN
         NEW.serial,
         'En reparacion',
         'Desmanchado',
-        'Desmanchado',
+        'Reparacion rapida',
         CURRENT_DATE::text,
         NOW()::text,
         'Sistema Automático',
@@ -83,8 +82,8 @@ BEGIN
         gen_random_uuid()
     );
 
-    RAISE LOG '[auto_desmanchado] Molde "%" enviado a desmanchado (vueltas=%, freq=%)',
-        NEW.serial, NEW.vueltas_actuales, v_vueltas_desmanch;
+    RAISE LOG '[auto_desmanchado] Molde "%" → desmanchado automático (vueltas=%, umbral=%)',
+        NEW.serial, NEW.vueltas_actuales, v_umbral;
 
     RETURN NEW;
 END;
@@ -96,7 +95,7 @@ $$;
 DROP TRIGGER IF EXISTS trg_auto_desmanchado ON public.moldes;
 
 
--- ── PASO 3: Crear el trigger en moldes ───────────────────────
+-- ── PASO 3: Crear trigger en moldes ──────────────────────────
 
 CREATE TRIGGER trg_auto_desmanchado
 AFTER UPDATE OF vueltas_actuales
@@ -106,23 +105,20 @@ EXECUTE FUNCTION auto_desmanchado_moldes();
 
 
 -- ── VALIDACIÓN MANUAL ────────────────────────────────────────
--- Verifica cuáles moldes están próximos al umbral de desmanchado:
-
 /*
 SELECT
     serial,
     nombre_articulo,
-    estado,
+    estado::text,
     vueltas_actuales,
     vueltas_desmanchado,
     CASE
+        WHEN vueltas_desmanchado > 0 AND vueltas_actuales % vueltas_desmanchado = 0
+            THEN 'DEBE DESMANCHAR AHORA'
         WHEN vueltas_desmanchado > 0
-         AND vueltas_actuales % vueltas_desmanchado = 0
-        THEN '⚠️ DEBE DESMANCHAR'
-        WHEN vueltas_desmanchado > 0
-        THEN CONCAT(vueltas_desmanchado - (vueltas_actuales % vueltas_desmanchado), ' vueltas para desmanchar')
-        ELSE 'Sin frecuencia configurada'
-    END AS estado_desmanchado
+            THEN CONCAT(vueltas_desmanchado - (vueltas_actuales % vueltas_desmanchado), ' vueltas restantes')
+        ELSE 'Sin umbral configurado'
+    END AS proximo_desmanchado
 FROM public.moldes
 WHERE vueltas_desmanchado > 0
 ORDER BY (vueltas_actuales % vueltas_desmanchado) ASC

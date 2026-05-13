@@ -411,10 +411,10 @@ export const moldsService = {
         // PRIORIDAD 1: Defecto "Límite de vueltas alcanzado" → siempre En reparacion
         // PRIORIDAD 2: Mapeo por ESTADO
         let estadoDestino: string
-        if (defectoNorm.includes('limite') && defectoNorm.includes('vueltas')) {
-            estadoDestino = 'Por desmanchar'
-        } else if (estadoNorm.includes('entregado')) {
+        if (estadoNorm.includes('entregado')) {
             estadoDestino = 'Disponible'
+        } else if (defectoNorm.includes('desmanch')) {
+            estadoDestino = 'Por desmanchar'
         } else if (
             estadoNorm.includes('reparacion') ||
             estadoNorm.includes('reparación') ||

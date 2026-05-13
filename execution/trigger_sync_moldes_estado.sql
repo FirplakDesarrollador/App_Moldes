@@ -2,25 +2,22 @@
 -- TRIGGER SQL: Sincronización automática BD_moldes → moldes
 -- ============================================================
 --
--- MAPEO DE ESTADO:
---   BD_moldes.DEFECTOS A REPARAR / ESTADO    → moldes.estado
+-- MAPEO (en orden de prioridad):
+--   BD_moldes                                → moldes.estado
 --   ──────────────────────────────────────     ──────────────────────
---   'Límite de vueltas alcanzado' (defecto)  → 'Por desmanchar'  ← PRIORIDAD
---   'En reparacion' (variantes)              → 'En reparacion'
---   'En espera - Moldes/Produccion'          → 'En reparacion'
---   'Entregado'                              → 'Disponible'
---   'Destruido'                              → 'Destruido'
---   Cualquier otro                           → No hace nada (seguro)
+--   ESTADO contiene 'entregado'              → 'Disponible'      (prioridad 1)
+--   DEFECTOS contiene 'desmanch'             → 'Por desmanchar'  (prioridad 2)
+--   ESTADO contiene 'reparacion' / 'espera'  → 'En reparacion'   (prioridad 3)
+--   ESTADO contiene 'destruido'              → 'Destruido'       (prioridad 4)
+--   Cualquier otro                           → No hace nada
 --
 -- CÓMO EJECUTAR:
---   1. Ir a Supabase → SQL Editor
---   2. Pegar este script completo
---   3. Ejecutar (Run)
+--   Supabase → SQL Editor → pegar todo → Run
+--   (Ejecutar ANTES de trigger_auto_desmanchado.sql)
 -- ============================================================
 
 
 -- ── PASO 1: Agregar 'Por desmanchar' al enum si no existe ────
--- (seguro ejecutar aunque ya exista)
 
 DO $$
 BEGIN
@@ -51,20 +48,21 @@ BEGIN
     v_estado_bd    := LOWER(TRIM(COALESCE(NEW."ESTADO", '')));
     v_defecto_bd   := LOWER(TRIM(COALESCE(NEW."DEFECTOS A REPARAR", '')));
 
-    -- PRIORIDAD 1: Defecto "Límite de vueltas alcanzado" → Por desmanchar
-    IF v_defecto_bd ILIKE '%limite%vueltas%'
-    OR v_defecto_bd ILIKE '%límite%vueltas%' THEN
-        v_estado_destino := 'Por desmanchar';
-
-    -- PRIORIDAD 2: Mapeo por ESTADO
-    ELSIF v_estado_bd ILIKE '%entregado%' THEN
+    -- PRIORIDAD 1: Entregado → Disponible (siempre gana, independiente del defecto)
+    IF v_estado_bd ILIKE '%entregado%' THEN
         v_estado_destino := 'Disponible';
 
+    -- PRIORIDAD 2: Defecto 'Desmanchado' → Por desmanchar
+    ELSIF v_defecto_bd ILIKE '%desmanch%' THEN
+        v_estado_destino := 'Por desmanchar';
+
+    -- PRIORIDAD 3: En reparacion / En espera → En reparacion
     ELSIF v_estado_bd ILIKE '%reparacion%'
        OR v_estado_bd ILIKE '%reparación%'
        OR v_estado_bd ILIKE '%espera%' THEN
         v_estado_destino := 'En reparacion';
 
+    -- PRIORIDAD 4: Destruido
     ELSIF v_estado_bd ILIKE '%destruido%' THEN
         v_estado_destino := 'Destruido';
 
@@ -72,7 +70,7 @@ BEGIN
         RETURN NEW;
     END IF;
 
-    -- Cast explícito a estado_molde_type porque moldes.estado es un enum
+    -- Cast explícito necesario porque moldes.estado es enum estado_molde_type
     UPDATE public.moldes
     SET    estado = v_estado_destino::estado_molde_type
     WHERE  LOWER(TRIM(serial)) = LOWER(v_codigo_molde)
@@ -88,7 +86,7 @@ END;
 $$;
 
 
--- ── PASO 3: Eliminar trigger anterior y recrear ──────────────
+-- ── PASO 3: Recrear trigger en BD_moldes ─────────────────────
 
 DROP TRIGGER IF EXISTS trg_sync_moldes_estado ON public."BD_moldes";
 
@@ -99,14 +97,15 @@ FOR EACH ROW
 EXECUTE FUNCTION sync_moldes_estado();
 
 
--- ── PASO 4: Sincronizar moldes existentes con "Límite de vueltas" ──
+-- ── PASO 4: Corregir moldes existentes desincronizados ───────
+-- Pone 'Por desmanchar' a moldes que ya tienen defecto 'Desmanchado' activo
 
 UPDATE public.moldes m
 SET    estado = 'Por desmanchar'::estado_molde_type
 FROM   public."BD_moldes" b
 WHERE  LOWER(TRIM(m.serial)) = LOWER(TRIM(b."CODIGO MOLDE"))
-  AND  (b."DEFECTOS A REPARAR" ILIKE '%limite%vueltas%'
-     OR b."DEFECTOS A REPARAR" ILIKE '%límite%vueltas%')
+  AND  b."DEFECTOS A REPARAR" ILIKE '%desmanch%'
+  AND  b."ESTADO" NOT ILIKE '%entregado%'
   AND  m.estado <> 'Por desmanchar'::estado_molde_type;
 
 
@@ -116,16 +115,16 @@ SELECT
     b."CODIGO MOLDE"        AS codigo,
     b."ESTADO"              AS bd_estado,
     b."DEFECTOS A REPARAR"  AS defecto,
-    m.estado                AS moldes_estado,
+    b."Tipo de reparacion"  AS tipo,
+    m.estado::text          AS moldes_estado,
     CASE
-        WHEN (b."DEFECTOS A REPARAR" ILIKE '%limite%vueltas%')
-             AND m.estado = 'Por desmanchar' THEN '✅ OK'
-        WHEN b."ESTADO" ILIKE '%reparacion%' AND m.estado = 'En reparacion' THEN '✅ OK'
-        WHEN b."ESTADO" ILIKE '%entregado%'  AND m.estado = 'Disponible'    THEN '✅ OK'
-        ELSE '❌ DESINCRONIZADO'
+        WHEN b."ESTADO" ILIKE '%entregado%'  AND m.estado = 'Disponible'     THEN 'OK'
+        WHEN b."DEFECTOS A REPARAR" ILIKE '%desmanch%' AND m.estado = 'Por desmanchar' THEN 'OK'
+        WHEN b."ESTADO" ILIKE '%reparacion%' AND m.estado = 'En reparacion'  THEN 'OK'
+        ELSE 'DESINCRONIZADO'
     END AS sincronizado
 FROM public."BD_moldes" b
 JOIN public.moldes m ON LOWER(TRIM(m.serial)) = LOWER(TRIM(b."CODIGO MOLDE"))
-WHERE b."DEFECTOS A REPARAR" ILIKE '%limite%vueltas%'
+WHERE b."DEFECTOS A REPARAR" ILIKE '%desmanch%'
 ORDER BY b."CODIGO MOLDE";
 */
