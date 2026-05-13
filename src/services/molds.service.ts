@@ -394,37 +394,36 @@ export const moldsService = {
     },
 
     // ── syncMoldEstado: Mapea el estado de BD_moldes al estado en la tabla maestra 'moldes' ──
-    async syncMoldEstado(codigoMolde: string, estadoBD: string, titulo?: string): Promise<void> {
+    async syncMoldEstado(codigoMolde: string, estadoBD: string, titulo?: string, defectosBD?: string): Promise<void> {
         const supabase = createClient()
 
-        // 1. Normalizar código y estado
+        // 1. Normalizar código, estado y defecto
         const codigoNorm = (codigoMolde || '').trim()
         const estadoNorm = (estadoBD || '').trim().toLowerCase()
+        const defectoNorm = (defectosBD || '').trim().toLowerCase()
 
         if (!codigoNorm) {
             console.warn('[syncMoldEstado] Código de molde vacío, omitiendo sincronización.')
             return
         }
 
-        // 2. Mapeo de estado BD_moldes → estado en tabla 'moldes'
-        // Reglas solicitadas:
-        // - "Entregado" (BD_moldes) -> "Disponible" (moldes)
-        // - "En reparacion", "En espera - Moldes", "En espera - Produccion" (BD_moldes) -> "En reparacion" (moldes)
-        // - "Destruido" (BD_moldes) -> "Destruido" (moldes)
-        
+        // 2. Mapeo BD_moldes → moldes.estado
+        // PRIORIDAD 1: Defecto "Límite de vueltas alcanzado" → siempre En reparacion
+        // PRIORIDAD 2: Mapeo por ESTADO
         let estadoDestino: string
-        if (estadoNorm.includes('entregado')) {
+        if (defectoNorm.includes('limite') && defectoNorm.includes('vueltas')) {
+            estadoDestino = 'En reparacion'
+        } else if (estadoNorm.includes('entregado')) {
             estadoDestino = 'Disponible'
         } else if (
-            estadoNorm.includes('reparacion') || 
-            estadoNorm.includes('reparación') || 
+            estadoNorm.includes('reparacion') ||
+            estadoNorm.includes('reparación') ||
             estadoNorm.includes('espera')
         ) {
             estadoDestino = 'En reparacion'
         } else if (estadoNorm.includes('destruido')) {
             estadoDestino = 'Destruido'
         } else {
-            // Si es otro estado, podemos optar por no sincronizar o loguear
             console.warn(`[syncMoldEstado] Estado "${estadoBD}" no mapeado para sincronización maestra.`)
             return
         }
@@ -633,7 +632,7 @@ export const moldsService = {
         }
 
         // 4. SINCRONIZAR ESTADO en tabla maestra 'moldes' (solo campo estado)
-        await this.syncMoldEstado(codigoMolde, record.estado, record.titulo)
+        await this.syncMoldEstado(codigoMolde, record.estado, record.titulo, record.defectos_a_reparar)
 
         return saved
     },
