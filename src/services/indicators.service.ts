@@ -36,6 +36,7 @@ export interface HistoricalMoldRaw {
     responsable: string | null
     created?: string
     repair_event_id?: string | null
+    [key: string]: any // Permite acceder a columnas con espacios de Supabase
 }
 
 // ── Normalised row for the UI ─────────────────────────────────────────────────
