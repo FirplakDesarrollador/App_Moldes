@@ -106,7 +106,7 @@ BEGIN
                 "DEFECTOS A REPARAR" = v_defectos,
                 "FECHA ENTRADA" = CURRENT_DATE,
                 "FECHA ESPERADA" = v_fecha_esperada,
-                "Modified" = NOW()::text,
+                "Modified" = NOW(),
                 "Modified By" = 'Sistema Automático'
             WHERE id = v_id_bd;
         END IF;
@@ -135,9 +135,9 @@ BEGIN
             'Rapida',
             CURRENT_DATE::text,
             v_fecha_esperada::text,
-            NOW()::text,
+            NOW(),
             'Sistema Automático',
-            NOW()::text,
+            NOW(),
             'Sistema Automático',
             gen_random_uuid()
         );
