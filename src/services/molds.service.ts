@@ -43,6 +43,16 @@ export interface MoldActive {
     repair_event_id?: string
 }
 
+function normalizeRepairType(val: any): string {
+    const str = String(val || '').toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
+        .trim();
+    if (str.includes('rapida')) return 'rapida';
+    if (str.includes('especial')) return 'especial';
+    if (str.includes('desmanchado')) return 'desmanchado';
+    return str;
+}
+
 export const moldsService = {
     // Return all records from MASTER 'moldes' table
     async getAll() {
@@ -557,23 +567,21 @@ export const moldsService = {
         // Regla: BD_moldes solo guarda el último registro por tipo (o dos si son tipos diferentes)
         if (!existingId || isNew) {
             const tipoRep = (record.tipo_reparacion || record.tipo_de_reparacion || record["Tipo de reparacion"] || '').toString();
-            
-            // Buscamos ignorando tildes (usamos un array de posibilidades comunes)
-            const searchTerms = tipoRep.toLowerCase().includes('rapida') || tipoRep.toLowerCase().includes('rápida')
-                ? ['Rapida', 'Rápida']
-                : [tipoRep];
+            const normalizedNewType = normalizeRepairType(tipoRep);
 
+            // Consultar todos los registros existentes para este molde
             const { data: existingData } = await supabase
                 .from('BD_moldes')
-                .select('id')
-                .ilike('CODIGO MOLDE', codigoMolde)
-                .in('Tipo de reparacion', searchTerms) // Buscar cualquier variante (con o sin tilde)
-                .order('id', { ascending: false })
-                .limit(1)
-            
+                .select('id, "Tipo de reparacion"')
+                .ilike('CODIGO MOLDE', codigoMolde);
+
             if (existingData && existingData.length > 0) {
-                existingId = existingData[0].id;
-                console.log(`[saveRegistro] Molde/Tipo detectado (incluso con tildes) → Actualizando ID: ${existingId}`);
+                // Buscar si coincide por tipo normalizado
+                const match = existingData.find(r => normalizeRepairType(r["Tipo de reparacion"]) === normalizedNewType);
+                if (match) {
+                    existingId = match.id;
+                    console.log(`[saveRegistro] Registro coincidente detectado en BD_moldes por tipo normalizado (${normalizedNewType}) → Actualizando ID: ${existingId}`);
+                }
             }
         }
 
