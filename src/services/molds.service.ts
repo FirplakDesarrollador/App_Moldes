@@ -556,7 +556,7 @@ export const moldsService = {
         let existingId = record.id;
         // Regla: BD_moldes solo guarda el último registro por tipo (o dos si son tipos diferentes)
         if (!existingId || isNew) {
-            const tipoRep = (record.tipo_reparacion || record["Tipo de reparacion"] || '').toString();
+            const tipoRep = (record.tipo_reparacion || record.tipo_de_reparacion || record["Tipo de reparacion"] || '').toString();
             
             // Buscamos ignorando tildes (usamos un array de posibilidades comunes)
             const searchTerms = tipoRep.toLowerCase().includes('rapida') || tipoRep.toLowerCase().includes('rápida')
