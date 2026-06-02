@@ -46,6 +46,9 @@ export default function RegistroMoldesPage() {
     const [masterSearch, setMasterSearch] = useState('')
     const [masterSearchType, setMasterSearchType] = useState<'codigo' | 'titulo'>('codigo')
 
+    // Active repair duplicate warning (create mode only)
+    const [activeRepairWarning, setActiveRepairWarning] = useState<{ tipo: string; estado: string }[]>([])
+
     // Defect Dropdown State
     const [defectSearch, setDefectSearch] = useState('')
     const [showDefectDropdown, setShowDefectDropdown] = useState(false)
@@ -178,11 +181,24 @@ export default function RegistroMoldesPage() {
         fetchInitial(s.serial, filterView)
     }
 
+    async function checkAndWarnActiveRepairs(codigoMolde: string) {
+        if (!isCreateMode || !codigoMolde || codigoMolde.length < 3) {
+            setActiveRepairWarning([])
+            return
+        }
+        try {
+            const active = await moldsService.checkActiveRepairsForMold(codigoMolde)
+            setActiveRepairWarning(active)
+        } catch (e) {
+            console.error(e)
+        }
+    }
+
     // Modal search (within Nuevo registro): must use base_datos_historico_moldes
     async function handleMasterSearch(val: string, type: 'codigo' | 'titulo') {
         setMasterSearch(val)
         setMasterSearchType(type)
-        
+
         // Sincronizar con el formulario para permitir ingreso manual si es necesario
         if (type === 'codigo') {
             setEditForm((prev: any) => ({ ...prev, codigo_molde: val }))
@@ -192,6 +208,7 @@ export default function RegistroMoldesPage() {
 
         if (val.length < 2) {
             setMasterMolds([])
+            setActiveRepairWarning([])
             return
         }
         try {
@@ -200,6 +217,7 @@ export default function RegistroMoldesPage() {
         } catch (e) {
             console.error(e)
         }
+        if (type === 'codigo') checkAndWarnActiveRepairs(val)
     }
 
 
@@ -221,6 +239,7 @@ export default function RegistroMoldesPage() {
         }))
         setMasterMolds([])
         setMasterSearch(m.codigo_molde)
+        checkAndWarnActiveRepairs(m.codigo_molde)
     }
 
     // Requirement 2.6: Calculation excluding Sat, Sun and holidays
@@ -292,6 +311,7 @@ export default function RegistroMoldesPage() {
 
     const handleEditClick = (record: any) => {
         setIsCreateMode(false)
+        setActiveRepairWarning([])
         setEditingRecord(record)
         setEditForm({ ...record })
         setMasterSearch(record.codigo_molde || '')
@@ -299,8 +319,9 @@ export default function RegistroMoldesPage() {
 
     const handleCreateClick = () => {
         setIsCreateMode(true)
+        setActiveRepairWarning([])
         const today = new Date().toISOString().split('T')[0];
-        setEditingRecord({ id: 'NEW' }) 
+        setEditingRecord({ id: 'NEW' })
         setEditForm({
             codigo_molde: '',
             titulo: '',
@@ -322,6 +343,18 @@ export default function RegistroMoldesPage() {
     const handleSave = async () => {
         setIsSaving(true)
         try {
+            // Bloquear creación si el molde ya tiene reparaciones activas
+            if (isCreateMode && activeRepairWarning.length > 0) {
+                const tiposActivos = activeRepairWarning.map(r => r.tipo).join(', ')
+                const confirmar = window.confirm(
+                    `Este molde ya tiene ${activeRepairWarning.length > 1 ? 'reparaciones activas' : 'una reparación activa'}: ${tiposActivos}.\n\n¿Deseas crear un nuevo registro de todas formas?`
+                )
+                if (!confirmar) {
+                    setIsSaving(false)
+                    return
+                }
+            }
+
             // Map app state to SAP expected state
             let sapEstado = editForm.estado;
             if (editForm.estado === 'Entregado' || editForm.estado === 'ENTREGADO') sapEstado = 'Activo';
@@ -569,12 +602,34 @@ export default function RegistroMoldesPage() {
                                     <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em] mt-1">Conectado a BD_moldes & Moldes Maestro</p>
                                 </div>
                             </div>
-                            <button onClick={() => setEditingRecord(null)} className="p-3 hover:bg-red-50 hover:text-red-500 rounded-2xl transition-all"><X className="w-7 h-7" /></button>
+                            <button onClick={() => { setEditingRecord(null); setActiveRepairWarning([]) }} className="p-3 hover:bg-red-50 hover:text-red-500 rounded-2xl transition-all"><X className="w-7 h-7" /></button>
                         </div>
 
                         {/* Modal Body */}
                         <div className="p-10 overflow-y-auto space-y-10 custom-scrollbar">
-                            
+
+                            {/* Advertencia: reparaciones activas (solo en modo creación) */}
+                            {isCreateMode && activeRepairWarning.length > 0 && (
+                                <div className="flex items-start gap-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700 rounded-2xl px-6 py-5">
+                                    <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                                    <div>
+                                        <p className="text-[11px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-400">
+                                            Este molde ya tiene {activeRepairWarning.length > 1 ? 'reparaciones activas' : 'una reparación activa'}
+                                        </p>
+                                        <ul className="mt-1 space-y-0.5">
+                                            {activeRepairWarning.map((r, i) => (
+                                                <li key={i} className="text-xs font-semibold text-amber-600 dark:text-amber-300">
+                                                    {r.tipo} — {r.estado}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                        <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">
+                                            Si guardas, se pedirá confirmación antes de crear el nuevo registro.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Section 1: Mold Identification */}
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3 mb-2">

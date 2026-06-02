@@ -54,6 +54,22 @@ function normalizeRepairType(val: any): string {
 }
 
 export const moldsService = {
+    async checkActiveRepairsForMold(codigoMolde: string): Promise<{ tipo: string; estado: string }[]> {
+        const supabase = createClient()
+        const ACTIVE_STATES = [
+            'En reparación', 'En reparacion', 'EN REPARACION',
+            'En espera - Produccion', 'En espera - Producción', 'En espera produccion',
+            'EN ESPERA - PRODUCCION', 'En espera - Moldes', 'En espera - reparación',
+            'En espera moldes', 'EN ESPERA - MOLDES',
+        ]
+        const { data } = await supabase
+            .from('BD_moldes')
+            .select('"Tipo de reparacion", ESTADO')
+            .ilike('CODIGO MOLDE', codigoMolde)
+            .in('ESTADO', ACTIVE_STATES)
+        return (data || []).map((r: any) => ({ tipo: r['Tipo de reparacion'] || '?', estado: r.ESTADO || '?' }))
+    },
+
     // Return all records from MASTER 'moldes' table
     async getAll() {
         const supabase = createClient()
@@ -562,26 +578,20 @@ export const moldsService = {
             dbRecord["FECHA ENTREGA"] = null;
         }
 
-        // 2. LÓGICA DE GUARDADO (Priorizar UPDATE si conocemos el ID o si el CODIGO MOLDE ya existe)
-        let existingId = record.id;
-        // Regla: BD_moldes solo guarda el último registro por tipo (o dos si son tipos diferentes)
-        if (!existingId || isNew) {
-            const tipoRep = (record.tipo_reparacion || record.tipo_de_reparacion || record["Tipo de reparacion"] || '').toString();
-            const normalizedNewType = normalizeRepairType(tipoRep);
-
-            // Consultar todos los registros existentes para este molde
+        // 2. LÓGICA DE GUARDADO — Regla: un único registro por CODIGO MOLDE en BD_moldes.
+        // Si ya existe cualquier registro para este código → UPDATE. Solo INSERT si no existe ninguno.
+        // isNew siempre parte de null para forzar la búsqueda en BD_moldes.
+        let existingId = isNew ? null : (record.id || null);
+        if (!existingId) {
             const { data: existingData } = await supabase
                 .from('BD_moldes')
-                .select('id, "Tipo de reparacion"')
-                .ilike('CODIGO MOLDE', codigoMolde);
+                .select('id')
+                .ilike('CODIGO MOLDE', codigoMolde)
+                .limit(1);
 
             if (existingData && existingData.length > 0) {
-                // Buscar si coincide por tipo normalizado
-                const match = existingData.find(r => normalizeRepairType(r["Tipo de reparacion"]) === normalizedNewType);
-                if (match) {
-                    existingId = match.id;
-                    console.log(`[saveRegistro] Registro coincidente detectado en BD_moldes por tipo normalizado (${normalizedNewType}) → Actualizando ID: ${existingId}`);
-                }
+                existingId = existingData[0].id;
+                console.log(`[saveRegistro] Registro existente encontrado en BD_moldes → Actualizando ID: ${existingId}, CODIGO: "${codigoMolde}"`);
             }
         }
 
@@ -593,12 +603,24 @@ export const moldsService = {
                 .update(dbRecord)
                 .eq('id', existingId)
                 .select()
-            
+
             if (error) {
                 console.error('[saveRegistro] Error en UPDATE BD_moldes:', error.message)
                 throw error
             }
             saved = data?.[0]
+
+            // Eliminar cualquier duplicado del mismo CODIGO MOLDE (registros distintos al que se acaba de actualizar)
+            const { data: dupes } = await supabase
+                .from('BD_moldes')
+                .select('id')
+                .ilike('CODIGO MOLDE', codigoMolde)
+                .neq('id', existingId)
+            if (dupes && dupes.length > 0) {
+                const dupeIds = dupes.map((d: any) => d.id)
+                console.log(`[saveRegistro] Eliminando ${dupeIds.length} registro(s) duplicado(s) de BD_moldes para CODIGO: "${codigoMolde}"`)
+                await supabase.from('BD_moldes').delete().in('id', dupeIds)
+            }
         } else {
             // INSERT: Registro totalmente nuevo
             console.log(`[saveRegistro] INSERTANDO NUEVO en BD_moldes → CODIGO: "${codigoMolde}"`)
