@@ -217,15 +217,22 @@ export const indicatorsService = {
             r.fecha_esperada && r.fecha_esperada >= dateRange.start && r.fecha_esperada <= dateRange.end
         )
 
-        // B. Entregados: FECHA ENTREGA in range
-        const entregadosRaw = deduplicated.filter(r => 
-            r.fecha_entrega && r.fecha_entrega >= dateRange.start && r.fecha_entrega <= dateRange.end
-        )
+        // B. Entregados: FECHA ENTREGA in range, o DESTRUIDO (usa fecha_entrega si existe, sino fecha_esperada)
+        const isResuelto = (r: HistoricalMoldRaw) => {
+            const estado = (r.estado || '').toLowerCase()
+            const isDestruido = estado.includes('destruido')
+            const fechaRef = r.fecha_entrega || (isDestruido ? r.fecha_esperada : null)
+            return fechaRef && fechaRef >= dateRange.start && fechaRef <= dateRange.end
+        }
+        const entregadosRaw = deduplicated.filter(isResuelto)
 
-        // C. Atrasados previos: Esperados antes del inicio y que sigan activos en el historial más reciente
-        const atrasadosRaw = deduplicated.filter(r => 
-            r.fecha_esperada && r.fecha_esperada < dateRange.start && ACTIVE_STATES.includes(r.estado || '')
-        )
+        // C. Atrasados previos: Esperados antes del inicio y que sigan activos (destruido NO es atrasado)
+        const atrasadosRaw = deduplicated.filter(r => {
+            const estado = (r.estado || '').toLowerCase()
+            return r.fecha_esperada && r.fecha_esperada < dateRange.start
+                && ACTIVE_STATES.includes(r.estado || '')
+                && !estado.includes('destruido')
+        })
 
         const comprometidos = comprometidosRaw.map(mapHistoricalRow)
         const entregados = entregadosRaw.map(mapHistoricalRow)
@@ -245,7 +252,10 @@ export const indicatorsService = {
             return comprometidos.some(c => c.id === e.id)
         }).length
         
-        const totalPendientes = comprometidos.filter(r => !r.fecha_entrega).length
+        const totalPendientes = comprometidos.filter(r => {
+            const isDestruido = (r.estado || '').toLowerCase().includes('destruido')
+            return !r.fecha_entrega && !isDestruido
+        }).length
         const nivelServicio = totalComprometidas > 0
             ? (totalEntregadasATiempo / totalComprometidas) * 100
             : 0
@@ -383,13 +393,16 @@ export const indicatorsService = {
         })
         const moldesEsperados = esperadosRows.length
 
-        // 5. Entregados a Tiempo (Esperados en rango y entregados antes del fin del rango)
+        // 5. Entregados a Tiempo — incluye destruidos (fecha_entrega o fecha_esperada como referencia)
         const entregadosRows = deduplicated.filter(r => {
-            const fe  = r.fecha_entrega
             const fes = r.fecha_esperada
             const status = (r.estado || '').toLowerCase()
-            if (!fe || !fes || !status.includes('entrega')) return false
-            return (dayjs(fes).isBetween(dateRange.start, dateRange.end, 'day', '[]') && dayjs(fe).isSameOrBefore(dayjs(dateRange.end), 'day'))
+            const isDestruido = status.includes('destruido')
+            const isEntregado = status.includes('entrega')
+            if (!fes || (!isEntregado && !isDestruido)) return false
+            const fechaRef = r.fecha_entrega || (isDestruido ? fes : null)
+            if (!fechaRef) return false
+            return (dayjs(fes).isBetween(dateRange.start, dateRange.end, 'day', '[]') && dayjs(fechaRef).isSameOrBefore(dayjs(dateRange.end), 'day'))
         })
         const moldesEntregados = entregadosRows.length
 

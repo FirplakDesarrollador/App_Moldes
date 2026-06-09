@@ -714,7 +714,7 @@ export default function RegistroMoldesPage() {
                                             onChange={(e) => {
                                                 const newStatus = e.target.value;
                                                 const updates: any = { estado: newStatus };
-                                                if (newStatus === 'Entregado' && !editForm.fecha_entrega) {
+                                                if ((newStatus === 'Entregado' || newStatus === 'Destruido') && !editForm.fecha_entrega) {
                                                     updates.fecha_entrega = new Date().toISOString().split('T')[0];
                                                 }
                                                 setEditForm({...editForm, ...updates});

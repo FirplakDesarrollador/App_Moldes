@@ -572,7 +572,7 @@ export const moldsService = {
 
         // REGLA: La fecha de entrega debe ser NULL si el estado no es uno de los estados de "finalizado/entregado"
         const estadoNorm = (record.estado || '').toLowerCase().trim();
-        const estadosConEntrega = ['entregado', 'activo', 'disponible', 'ok'];
+        const estadosConEntrega = ['entregado', 'activo', 'disponible', 'ok', 'destruido'];
         
         if (!estadosConEntrega.includes(estadoNorm)) {
             dbRecord["FECHA ENTREGA"] = null;
