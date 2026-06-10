@@ -386,62 +386,60 @@ export const indicatorsService = {
 
         const totalMoldesReparados = weightedTotal
 
-        // Segunda deduplicación por codigo_molde para esperados/entregados:
-        // Si un molde fue re-registrado (fecha_entrada distinta), pueden sobrevivir dos entradas con
-        // claves diferentes en la deduplicación principal. Para el conteo de nivel de servicio cada
-        // molde debe contar máximo una vez. Se conserva el registro de mayor ID (más reciente).
-        const latestPerMold: Record<string, HistoricalMoldRaw> = {}
-        for (const r of deduplicated) {
-            const key = (r.codigo_molde || '').trim().toUpperCase()
-            const cur = latestPerMold[key]
-            if (!cur) {
-                latestPerMold[key] = r
-            } else {
-                const rResuelto = !!r.fecha_entrega || (r.estado || '').toLowerCase().includes('destruido')
-                const curResuelto = !!cur.fecha_entrega || (cur.estado || '').toLowerCase().includes('destruido')
-                if (rResuelto && !curResuelto) {
-                    latestPerMold[key] = r
-                } else if (rResuelto === curResuelto && r.id > cur.id) {
-                    latestPerMold[key] = r
-                }
-            }
-        }
-        const deduplicatedByMold = Object.values(latestPerMold)
+        // 4. ESPERADOS — Se leen de BD_moldes (estado actual) para evitar registros fantasma
+        // del histórico cuando un molde fue re-registrado con distinta fecha_esperada.
+        const { data: bdEsperadosRaw } = await supabase
+            .from('BD_moldes')
+            .select('"CODIGO MOLDE", "Título", "FECHA ENTRADA", "FECHA ESPERADA", "FECHA ENTREGA", ESTADO, "Tipo de reparacion", "DEFECTOS A REPARAR", Responsable')
+            .gte('"FECHA ESPERADA"', dateRange.start)
+            .lte('"FECHA ESPERADA"', dateRange.end)
+            .or('"Tipo de reparacion".ilike.%rapida%,"Tipo de reparacion".ilike.%rápida%,"Tipo de reparacion".ilike.%desmanch%,"Tipo de reparacion".ilike.%brill%,"DEFECTOS A REPARAR".ilike.%rapida%,"DEFECTOS A REPARAR".ilike.%rápida%,"DEFECTOS A REPARAR".ilike.%desmanch%,"DEFECTOS A REPARAR".ilike.%brill%')
 
-        // 4. Esperados en Rango
-        const esperadosRows = deduplicatedByMold.filter(r => {
-            const fes = r.fecha_esperada
-            return fes && dayjs(fes).isBetween(dateRange.start, dateRange.end, 'day', '[]')
-        })
+        const esperadosRows: MoldIndicatorRow[] = (bdEsperadosRaw || []).map((r: any) => ({
+            id: 0,
+            serial: r['CODIGO MOLDE'] || '',
+            nombre_articulo: r['Título'] || '',
+            fecha_entrada: r['FECHA ENTRADA'] ?? null,
+            fecha_esperada: r['FECHA ESPERADA'] ?? null,
+            fecha_entrega: r['FECHA ENTREGA'] ?? null,
+            estado: r['ESTADO'] || '',
+            tipo_de_reparacion: r['Tipo de reparacion'] || '',
+            tipo: '',
+            defectos: r['DEFECTOS A REPARAR'] || '',
+            responsable: r['Responsable'] || '',
+        }))
         const moldesEsperados = esperadosRows.length
 
-        // 5. Entregados a Tiempo — incluye destruidos (fecha_entrega o fecha_esperada como referencia)
-        const entregadosRows = deduplicatedByMold.filter(r => {
-            const fes = r.fecha_esperada
+        // Conjunto de códigos comprometidos para cruzar con entregados
+        const esperadosCodigos = new Set(esperadosRows.map(r => (r.serial || '').trim().toUpperCase()))
+
+        // 5. ENTREGADOS — Del histórico, dentro del período, cruzados contra esperados actuales
+        const entregadosRows = deduplicated.filter(r => {
             const status = (r.estado || '').toLowerCase()
             const isDestruido = status.includes('destruido')
             const isEntregado = status.includes('entrega')
-            if (!fes || (!isEntregado && !isDestruido)) return false
-            const fechaRef = r.fecha_entrega || (isDestruido ? fes : null)
+            if (!isEntregado && !isDestruido) return false
+            const fechaRef = r.fecha_entrega || (isDestruido ? r.fecha_esperada : null)
             if (!fechaRef) return false
-            return (dayjs(fes).isBetween(dateRange.start, dateRange.end, 'day', '[]') && dayjs(fechaRef).isSameOrBefore(dayjs(dateRange.end), 'day'))
+            const codigoNorm = (r.codigo_molde || '').trim().toUpperCase()
+            return esperadosCodigos.has(codigoNorm) && dayjs(fechaRef).isSameOrBefore(dayjs(dateRange.end), 'day')
         })
         const moldesEntregados = entregadosRows.length
 
-        const productividad   = metaTotal > 0     ? totalMoldesReparados / metaTotal    : 0
-        const nivelServicio   = moldesEsperados > 0 ? moldesEntregados / moldesEsperados : 0
-        const productividadHH = totalOperarios > 0  ? totalMoldesReparados / totalOperarios : 0
+        const productividad   = metaTotal > 0       ? totalMoldesReparados / metaTotal    : 0
+        const nivelServicio   = moldesEsperados > 0  ? moldesEntregados / moldesEsperados  : 0
+        const productividadHH = totalOperarios > 0   ? totalMoldesReparados / totalOperarios : 0
 
         return {
             totalMoldesReparados,
-            countMS, countFV, 
+            countMS, countFV,
             countDesmanchadoMS, countDesmanchadoFV,
             countDesmanchado,
             moldesEsperados, moldesEntregados,
             metaTotal, metaPorPersona, totalOperarios, numDays,
             productividad, nivelServicio, productividadHH,
             reparados: reparadosFormatted,
-            esperadosList: esperadosRows.map(mapHistoricalRow),
+            esperadosList: esperadosRows,
             entregadosList: entregadosRows.map(mapHistoricalRow)
         }
     },
