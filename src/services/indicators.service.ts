@@ -385,16 +385,38 @@ export const indicatorsService = {
         }
 
         const totalMoldesReparados = weightedTotal
-        
+
+        // Segunda deduplicación por codigo_molde para esperados/entregados:
+        // Si un molde fue re-registrado (fecha_entrada distinta), pueden sobrevivir dos entradas con
+        // claves diferentes en la deduplicación principal. Para el conteo de nivel de servicio cada
+        // molde debe contar máximo una vez. Se conserva el registro de mayor ID (más reciente).
+        const latestPerMold: Record<string, HistoricalMoldRaw> = {}
+        for (const r of deduplicated) {
+            const key = (r.codigo_molde || '').trim().toUpperCase()
+            const cur = latestPerMold[key]
+            if (!cur) {
+                latestPerMold[key] = r
+            } else {
+                const rResuelto = !!r.fecha_entrega || (r.estado || '').toLowerCase().includes('destruido')
+                const curResuelto = !!cur.fecha_entrega || (cur.estado || '').toLowerCase().includes('destruido')
+                if (rResuelto && !curResuelto) {
+                    latestPerMold[key] = r
+                } else if (rResuelto === curResuelto && r.id > cur.id) {
+                    latestPerMold[key] = r
+                }
+            }
+        }
+        const deduplicatedByMold = Object.values(latestPerMold)
+
         // 4. Esperados en Rango
-        const esperadosRows = deduplicated.filter(r => {
+        const esperadosRows = deduplicatedByMold.filter(r => {
             const fes = r.fecha_esperada
             return fes && dayjs(fes).isBetween(dateRange.start, dateRange.end, 'day', '[]')
         })
         const moldesEsperados = esperadosRows.length
 
         // 5. Entregados a Tiempo — incluye destruidos (fecha_entrega o fecha_esperada como referencia)
-        const entregadosRows = deduplicated.filter(r => {
+        const entregadosRows = deduplicatedByMold.filter(r => {
             const fes = r.fecha_esperada
             const status = (r.estado || '').toLowerCase()
             const isDestruido = status.includes('destruido')
