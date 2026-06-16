@@ -185,7 +185,110 @@ function classifyDefecto(defectos: string | null, tipoRep?: string | null): { de
 }
 
 // ── Service ───────────────────────────────────────────────────────────────────
+export interface IndisponibilidadResult {
+    promedioDiasFuera: number
+    totalMoldes: number
+    enReparacionActual: number
+    indice: number
+    daysInMonth: number
+}
+
 export const indicatorsService = {
+    /** Devuelve los nombres únicos de referencias de moldes (para el selector). */
+    async getReferencias(): Promise<string[]> {
+        const supabase = createClient()
+        const { data } = await supabase
+            .from('moldes')
+            .select('nombre_articulo')
+            .neq('estado', 'Destruido')
+            .order('nombre_articulo', { ascending: true })
+        const unique = Array.from(new Set((data || []).map((r: any) => (r.nombre_articulo || '').trim()).filter(Boolean)))
+        return unique
+    },
+
+    /**
+     * Calcula el índice de indisponibilidad para una referencia de molde.
+     *
+     * Promedio días fuera = Σ(días en estado "En reparacion" dentro del rango por cada molde) / cantidad moldes no destruidos
+     * Índice               = promedio días fuera / días del mes del rango × 100
+     */
+    async getIndisponibilidadByRef(
+        nombreArticulo: string,
+        dateRange: { start: string; end: string }
+    ): Promise<IndisponibilidadResult> {
+        const supabase = createClient()
+        const today = new Date().toISOString().split('T')[0]
+
+        // 1. Moldes de la referencia no destruidos
+        const { data: moldMaster } = await supabase
+            .from('moldes')
+            .select('serial, estado')
+            .ilike('nombre_articulo', nombreArticulo)
+
+        const noDestruidos = (moldMaster || []).filter(
+            (m: any) => !(m.estado || '').toLowerCase().includes('destruido')
+        )
+        const totalMoldes = noDestruidos.length
+        if (totalMoldes === 0) {
+            return { promedioDiasFuera: 0, totalMoldes: 0, enReparacionActual: 0, indice: 0, daysInMonth: 30 }
+        }
+        const seriales = noDestruidos.map((m: any) => (m.serial || '').trim())
+
+        // 2. Registros activos en BD_moldes para esta referencia
+        const { data: bdActivos } = await supabase
+            .from('BD_moldes')
+            .select('"CODIGO MOLDE", "FECHA ENTRADA", ESTADO')
+            .in('"CODIGO MOLDE"', seriales)
+        const enReparacionActual = (bdActivos || []).filter((r: any) =>
+            (r['ESTADO'] || '').toLowerCase().includes('reparacion') ||
+            (r['ESTADO'] || '').toLowerCase().includes('espera')
+        ).length
+
+        // 3. Registros históricos: un registro por evento de reparación (deduplicado por codigo_molde + fecha_entrada)
+        const { data: histRaw } = await supabase
+            .from('base_datos_historico_moldes')
+            .select('codigo_molde, fecha_entrada, fecha_entrega, estado, id')
+            .in('codigo_molde', seriales)
+            .lte('fecha_entrada', dateRange.end)
+
+        // Deduplicar por (codigo_molde | fecha_entrada): conservar el de mayor ID
+        const eventMap: Record<string, any> = {}
+        for (const r of (histRaw || [])) {
+            const key = `${(r.codigo_molde || '').trim().toUpperCase()}|${r.fecha_entrada}`
+            if (!eventMap[key] || r.id > eventMap[key].id) eventMap[key] = r
+        }
+
+        // 4. Calcular días fuera dentro del rango para cada evento
+        const rangeStart = new Date(dateRange.start + 'T00:00:00')
+        const rangeEnd   = new Date(dateRange.end   + 'T00:00:00')
+
+        let totalDiasFuera = 0
+        for (const r of Object.values(eventMap)) {
+            const estadoNorm = (r.estado || '').toLowerCase()
+            const isRepair = estadoNorm.includes('reparacion') || estadoNorm.includes('espera')
+            if (!r.fecha_entrada || !isRepair) continue
+
+            const start  = new Date(r.fecha_entrada + 'T00:00:00')
+            const endRaw = r.fecha_entrega ? new Date(r.fecha_entrega + 'T00:00:00') : new Date(today + 'T00:00:00')
+
+            const overlapStart = start  > rangeStart ? start  : rangeStart
+            const overlapEnd   = endRaw < rangeEnd   ? endRaw : rangeEnd
+
+            if (overlapEnd < overlapStart) continue
+            const dias = Math.round((overlapEnd.getTime() - overlapStart.getTime()) / 86400000) + 1
+            totalDiasFuera += Math.max(0, dias)
+        }
+
+        // 5. Días del mes del período (denominador)
+        const refDate   = new Date(dateRange.end + 'T00:00:00')
+        const daysInMonth = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0).getDate()
+
+        const promedioDiasFuera = totalDiasFuera / totalMoldes
+        const indice = (promedioDiasFuera / daysInMonth) * 100
+
+        return { promedioDiasFuera, totalMoldes, enReparacionActual, indice, daysInMonth }
+    },
+
     /**
      * MIGRATED TO base_datos_historico_moldes
      */
