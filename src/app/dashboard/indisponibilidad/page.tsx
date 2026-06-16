@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Activity, Loader2, AlertCircle, CheckCircle2, BarChart3, Package, Search, X, RefreshCw } from 'lucide-react'
+import { Activity, Loader2, AlertCircle, CheckCircle2, BarChart3, Package, Search, X, RefreshCw, Download } from 'lucide-react'
 import { indicatorsService, IndisponibilidadResult, IndisponibilidadRow } from '@/services/indicators.service'
 import Navbar from '@/components/layout/Navbar'
 
@@ -96,6 +96,22 @@ export default function IndisponibilidadPage() {
         } finally {
             setLoading(false)
         }
+    }
+
+    const exportCSV = () => {
+        const lines = ['Referencia,Indice_Indisponibilidad']
+        for (const row of tableRows) {
+            const ref = `"${row.referencia.replace(/"/g, '""')}"`
+            const indice = (row.indice / 100).toFixed(4)
+            lines.push(`${ref},${indice}`)
+        }
+        const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `indisponibilidad_${tableRange.start}_${tableRange.end}.csv`
+        a.click()
+        URL.revokeObjectURL(url)
     }
 
     const loadTable = async (range = tableRange) => {
@@ -286,6 +302,11 @@ export default function IndisponibilidadPage() {
                             className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-black rounded-xl transition-all text-[10px] uppercase tracking-wider shadow shadow-violet-600/20">
                             {tableLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                             Actualizar
+                        </button>
+                        <button onClick={exportCSV} disabled={tableRows.length === 0 || tableLoading}
+                            className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-black rounded-xl transition-all text-[10px] uppercase tracking-wider shadow shadow-emerald-600/20">
+                            <Download className="w-3.5 h-3.5" />
+                            Exportar CSV
                         </button>
                     </div>
 
