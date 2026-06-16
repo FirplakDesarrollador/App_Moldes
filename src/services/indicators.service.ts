@@ -193,6 +193,10 @@ export interface IndisponibilidadResult {
     daysInMonth: number
 }
 
+export interface IndisponibilidadRow extends IndisponibilidadResult {
+    referencia: string
+}
+
 export const indicatorsService = {
     /** Devuelve los nombres únicos de referencias de moldes (para el selector). */
     async getReferencias(): Promise<string[]> {
@@ -287,6 +291,109 @@ export const indicatorsService = {
         const indice = (promedioDiasFuera / daysInMonth) * 100
 
         return { promedioDiasFuera, totalMoldes, enReparacionActual, indice, daysInMonth }
+    },
+
+    /**
+     * Calcula el índice de indisponibilidad para TODAS las referencias en 3 queries.
+     * Devuelve solo las que tienen indice > 0, ordenadas de mayor a menor.
+     */
+    async getAllIndisponibilidad(
+        dateRange: { start: string; end: string }
+    ): Promise<IndisponibilidadRow[]> {
+        const supabase = createClient()
+        const today = new Date().toISOString().split('T')[0]
+
+        const refDate = new Date(dateRange.end + 'T00:00:00')
+        const daysInMonth = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0).getDate()
+
+        // 1. Todos los moldes no destruidos agrupados por referencia
+        const { data: allMoldes } = await supabase
+            .from('moldes')
+            .select('serial, nombre_articulo, estado')
+
+        const refMap: Record<string, string[]> = {}
+        for (const m of (allMoldes || [])) {
+            const ref = (m.nombre_articulo || '').trim()
+            if (!ref || (m.estado || '').toLowerCase().includes('destruido')) continue
+            if (!refMap[ref]) refMap[ref] = []
+            refMap[ref].push((m.serial || '').trim())
+        }
+
+        // 2. Reparaciones activas actuales en BD_moldes
+        const { data: bdActivos } = await supabase
+            .from('BD_moldes')
+            .select('"CODIGO MOLDE", ESTADO')
+
+        const activosSet = new Set<string>()
+        for (const r of (bdActivos || [])) {
+            const estado = (r['ESTADO'] || '').toLowerCase()
+            if (estado.includes('reparacion') || estado.includes('espera')) {
+                activosSet.add((r['CODIGO MOLDE'] || '').trim().toUpperCase())
+            }
+        }
+
+        // 3. Histórico: eventos que empezaron antes del fin del rango
+        const { data: histRaw } = await supabase
+            .from('base_datos_historico_moldes')
+            .select('codigo_molde, fecha_entrada, fecha_entrega, estado, id')
+            .lte('fecha_entrada', dateRange.end)
+
+        // Deduplicar por (codigo_molde | fecha_entrada): mayor ID gana
+        const eventMap: Record<string, any> = {}
+        for (const r of (histRaw || [])) {
+            const key = `${(r.codigo_molde || '').trim().toUpperCase()}|${r.fecha_entrada}`
+            if (!eventMap[key] || r.id > eventMap[key].id) eventMap[key] = r
+        }
+
+        // Agrupar eventos por serial
+        const eventsBySerial: Record<string, any[]> = {}
+        for (const r of Object.values(eventMap)) {
+            const serial = (r.codigo_molde || '').trim().toUpperCase()
+            if (!eventsBySerial[serial]) eventsBySerial[serial] = []
+            eventsBySerial[serial].push(r)
+        }
+
+        const rangeStart = new Date(dateRange.start + 'T00:00:00')
+        const rangeEnd   = new Date(dateRange.end   + 'T00:00:00')
+
+        const results: IndisponibilidadRow[] = []
+
+        for (const [ref, serials] of Object.entries(refMap)) {
+            const totalMoldes = serials.length
+            if (totalMoldes === 0) continue
+
+            let enReparacionActual = 0
+            let totalDiasFuera = 0
+
+            for (const serial of serials) {
+                const serialUpper = serial.toUpperCase()
+                if (activosSet.has(serialUpper)) enReparacionActual++
+
+                for (const r of (eventsBySerial[serialUpper] || [])) {
+                    const estadoNorm = (r.estado || '').toLowerCase()
+                    if (!r.fecha_entrada || !(estadoNorm.includes('reparacion') || estadoNorm.includes('espera'))) continue
+
+                    const start  = new Date(r.fecha_entrada + 'T00:00:00')
+                    const endRaw = r.fecha_entrega ? new Date(r.fecha_entrega + 'T00:00:00') : new Date(today + 'T00:00:00')
+
+                    const overlapStart = start  > rangeStart ? start  : rangeStart
+                    const overlapEnd   = endRaw < rangeEnd   ? endRaw : rangeEnd
+
+                    if (overlapEnd < overlapStart) continue
+                    const dias = Math.round((overlapEnd.getTime() - overlapStart.getTime()) / 86400000) + 1
+                    totalDiasFuera += Math.max(0, dias)
+                }
+            }
+
+            const promedioDiasFuera = totalDiasFuera / totalMoldes
+            const indice = (promedioDiasFuera / daysInMonth) * 100
+
+            if (indice > 0) {
+                results.push({ referencia: ref, promedioDiasFuera, totalMoldes, enReparacionActual, indice, daysInMonth })
+            }
+        }
+
+        return results.sort((a, b) => b.indice - a.indice)
     },
 
     /**
