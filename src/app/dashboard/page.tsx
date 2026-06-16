@@ -2,18 +2,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase'
-import MoldSearch from '@/components/molds/MoldSearch'
-import AddMoldModal from '@/components/molds/AddMoldModal'
 import Navbar from '@/components/layout/Navbar'
-import SAPSessionBadge from '@/components/auth/SAPSessionBadge'
-import { Settings, Briefcase, Factory, CheckCircle2, TrendingUp, ClipboardList, Server } from 'lucide-react'
+import { Settings, Briefcase, Factory, TrendingUp, Server, Activity } from 'lucide-react'
 
 export default function DashboardPage() {
-    const [selectedMold, setSelectedMold] = useState<any>(null)
     const [user, setUser] = useState<any>(null)
     const [loading, setLoading] = useState(true)
-    const supabase = createClient()
 
     useEffect(() => {
         const storedUser = localStorage.getItem('moldapp_user')
@@ -24,11 +18,6 @@ export default function DashboardPage() {
         }
         setLoading(false)
     }, [])
-
-    const handleLogout = () => {
-        localStorage.removeItem('moldapp_user')
-        window.location.href = '/login'
-    }
 
     if (loading) {
         return (
@@ -53,10 +42,10 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Main Navigation Menu */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-16">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-16">
                     <button
                         onClick={() => window.location.href = '/dashboard/molds'}
-                        className="p-6 glass-card rounded-2xl border border-black/5 dark:border-white/5 hover:border-blue-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-blue-500/5 group"
+                        className="p-6 glass-card rounded-2xl border border-black/5 dark:border-white/5 hover:border-blue-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-blue-500/5"
                     >
                         <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-500/20 group-hover:scale-110 transition-transform">
                             <Settings className="w-6 h-6 text-blue-500 dark:text-blue-400" />
@@ -66,7 +55,7 @@ export default function DashboardPage() {
 
                     <button
                         onClick={() => window.location.href = '/dashboard/history'}
-                        className="p-6 glass-card rounded-2xl border border-black/5 dark:border-white/5 hover:border-purple-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-purple-500/5 group"
+                        className="p-6 glass-card rounded-2xl border border-black/5 dark:border-white/5 hover:border-purple-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-purple-500/5"
                     >
                         <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center border border-purple-500/20 group-hover:scale-110 transition-transform">
                             <Briefcase className="w-6 h-6 text-purple-500 dark:text-purple-400" />
@@ -76,7 +65,7 @@ export default function DashboardPage() {
 
                     <button
                         onClick={() => window.location.href = '/dashboard/raw-materials'}
-                        className="p-6 glass-card rounded-2xl border border-black/5 dark:border-white/5 hover:border-green-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-green-500/5 group"
+                        className="p-6 glass-card rounded-2xl border border-black/5 dark:border-white/5 hover:border-green-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-green-500/5"
                     >
                         <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center border border-green-500/20 group-hover:scale-110 transition-transform">
                             <Factory className="w-6 h-6 text-green-500 dark:text-green-400" />
@@ -86,7 +75,7 @@ export default function DashboardPage() {
 
                     <button
                         onClick={() => window.location.href = '/dashboard/indicators'}
-                        className="p-6 glass-card rounded-2xl border border-black/5 dark:border-white/5 hover:border-red-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-red-500/5 group"
+                        className="p-6 glass-card rounded-2xl border border-black/5 dark:border-white/5 hover:border-red-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-red-500/5"
                     >
                         <div className="w-12 h-12 bg-red-500/10 rounded-xl flex items-center justify-center border border-red-500/20 group-hover:scale-110 transition-transform">
                             <TrendingUp className="w-6 h-6 text-red-500 dark:text-red-400" />
@@ -95,8 +84,18 @@ export default function DashboardPage() {
                     </button>
 
                     <button
+                        onClick={() => window.location.href = '/dashboard/indisponibilidad'}
+                        className="p-6 glass-card rounded-2xl border border-black/5 dark:border-white/5 hover:border-violet-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-violet-500/5"
+                    >
+                        <div className="w-12 h-12 bg-violet-500/10 rounded-xl flex items-center justify-center border border-violet-500/20 group-hover:scale-110 transition-transform">
+                            <Activity className="w-6 h-6 text-violet-500 dark:text-violet-400" />
+                        </div>
+                        <span className="text-sm font-bold tracking-wide text-slate-800 dark:text-white">Índice de Indisponibilidad</span>
+                    </button>
+
+                    <button
                         onClick={() => window.location.href = '/dashboard/sap-items'}
-                        className="p-6 glass-card rounded-2xl border border-black/5 dark:border-white/5 hover:border-orange-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-orange-500/5 group"
+                        className="p-6 glass-card rounded-2xl border border-black/5 dark:border-white/5 hover:border-orange-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-orange-500/5"
                     >
                         <div className="w-12 h-12 bg-orange-500/10 rounded-xl flex items-center justify-center border border-orange-500/20 group-hover:scale-110 transition-transform">
                             <Server className="w-6 h-6 text-orange-500 dark:text-orange-400" />
@@ -105,16 +104,6 @@ export default function DashboardPage() {
                     </button>
                 </div>
             </div>
-
-            {selectedMold && (
-                <AddMoldModal
-                    moldToEdit={selectedMold}
-                    onClose={() => setSelectedMold(null)}
-                    onSuccess={() => {
-                        setSelectedMold(null)
-                    }}
-                />
-            )}
         </main>
     )
 }

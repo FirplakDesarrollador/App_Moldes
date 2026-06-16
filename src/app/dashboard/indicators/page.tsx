@@ -10,7 +10,6 @@ import {
 } from 'lucide-react'
 import {
     indicatorsService, IndicatorStats, MoldIndicatorRow, RapidaKPIResult, getDatesInRange,
-    IndisponibilidadResult
 } from '@/services/indicators.service'
 import Navbar from '@/components/layout/Navbar'
 
@@ -175,12 +174,6 @@ export default function IndicatorsPage() {
     const [selectedCat, setSelectedCat] = useState('Todos')
     const [numOperarios, setNumOperarios] = useState<number | ''>('')
 
-    // ── Selector de referencia e indisponibilidad ────────────────────────────
-    const [referenciasOptions, setReferenciasOptions] = useState<string[]>([])
-    const [selectedReferencia, setSelectedReferencia] = useState('')
-    const [indisponibilidad, setIndisponibilidad] = useState<IndisponibilidadResult | null>(null)
-    const [indispLoading, setIndispLoading] = useState(false)
-
     // ── Rápida-specific state ─────────────────────────────────────────────────
     const [rapidaDateRange, setRapidaDateRange] = useState({
         start: new Date().toISOString().split('T')[0],
@@ -217,7 +210,6 @@ export default function IndicatorsPage() {
         if (!stored) { router.push('/login'); return }
         setUser(JSON.parse(stored))
         loadStats(dateRange)
-        indicatorsService.getReferencias().then(setReferenciasOptions).catch(console.error)
     }, [router])
 
     const loadStats = async (range = dateRange) => {
@@ -226,15 +218,6 @@ export default function IndicatorsPage() {
             setStats(await indicatorsService.getKPIs(range))
         } catch (e) { console.error(e) }
         finally { setLoading(false) }
-    }
-
-    const loadIndisponibilidad = async (ref: string, range = dateRange) => {
-        if (!ref) { setIndisponibilidad(null); return }
-        setIndispLoading(true)
-        try {
-            setIndisponibilidad(await indicatorsService.getIndisponibilidadByRef(ref, range))
-        } catch (e) { console.error(e) }
-        finally { setIndispLoading(false) }
     }
 
     const loadRapidaStats = async () => {
@@ -392,30 +375,8 @@ export default function IndicatorsPage() {
                                     onChange={e => setNumOperarios(e.target.value === '' ? '' : parseInt(e.target.value))}
                                 />
                             </div>
-                            <div className="space-y-1.5 ml-0 md:ml-4">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
-                                    Referencia de molde
-                                </label>
-                                <select
-                                    className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-3 px-5 text-xs font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-violet-500/30 min-w-[240px]"
-                                    value={selectedReferencia}
-                                    onChange={e => {
-                                        const val = e.target.value
-                                        setSelectedReferencia(val)
-                                        loadIndisponibilidad(val, dateRange)
-                                    }}
-                                >
-                                    <option value="">— Seleccionar referencia —</option>
-                                    {referenciasOptions.map(ref => (
-                                        <option key={ref} value={ref}>{ref}</option>
-                                    ))}
-                                </select>
-                            </div>
                             <button
-                                onClick={() => {
-                                    loadStats()
-                                    if (selectedReferencia) loadIndisponibilidad(selectedReferencia, dateRange)
-                                }}
+                                onClick={() => loadStats()}
                                 className="ml-auto px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl transition-all shadow-lg shadow-blue-600/20 text-[10px] uppercase tracking-[0.2em]"
                             >
                                 Actualizar Reporte
@@ -553,42 +514,6 @@ export default function IndicatorsPage() {
                                     <div className="bg-white dark:bg-slate-900 border border-slate-200 p-6 rounded-2xl shadow-sm space-y-2"><Zap className="text-emerald-500" /><p className="text-3xl font-black text-emerald-600">{kpis.hasOps ? kpis.productividad.toFixed(1) : '—'}</p><p className="text-[9px] font-black uppercase text-slate-600">Productividad</p></div>
                                     <div className={`border p-6 rounded-2xl shadow-sm space-y-2 ${col.softBg} ${col.border}`}><activeCat.icon className={col.text} /><p className="text-sm font-black uppercase text-slate-700">{activeCat.label}</p><p className="text-[9px] font-black uppercase text-slate-500">Categoría activa</p></div>
                                 </div>
-
-                                {/* ── Índice de Indisponibilidad ── */}
-                                {selectedReferencia && (
-                                    <div className="bg-white dark:bg-slate-900 border border-violet-200 dark:border-violet-800/40 rounded-2xl shadow-sm p-6 space-y-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-violet-100 dark:bg-violet-900/30 rounded-xl"><Activity className="w-4 h-4 text-violet-500" /></div>
-                                            <div>
-                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300">Índice de Indisponibilidad</h4>
-                                                <p className="text-[9px] text-violet-500 font-bold uppercase truncate max-w-xs">{selectedReferencia}</p>
-                                            </div>
-                                            {indispLoading && <Loader2 className="w-4 h-4 animate-spin text-violet-400 ml-auto" />}
-                                        </div>
-                                        {indisponibilidad && !indispLoading && (
-                                            <div className="grid grid-cols-3 gap-6 pt-2 border-t border-violet-100 dark:border-violet-900/30">
-                                                <div className="space-y-1">
-                                                    <p className="text-3xl font-black text-violet-600">{indisponibilidad.promedioDiasFuera.toFixed(1)}</p>
-                                                    <p className="text-[9px] font-black uppercase text-slate-600">Promedio días fuera</p>
-                                                    <p className="text-[9px] text-slate-400">{indisponibilidad.totalMoldes} moldes en referencia</p>
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <p className={`text-3xl font-black ${indisponibilidad.indice >= 30 ? 'text-red-500' : indisponibilidad.indice >= 15 ? 'text-amber-500' : 'text-green-500'}`}>{indisponibilidad.indice.toFixed(1)}%</p>
-                                                    <p className="text-[9px] font-black uppercase text-slate-600">Índice de indisponibilidad</p>
-                                                    <p className="text-[9px] text-slate-400">Base: {indisponibilidad.daysInMonth} días del mes</p>
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <p className="text-3xl font-black text-orange-500">{indisponibilidad.enReparacionActual}</p>
-                                                    <p className="text-[9px] font-black uppercase text-slate-600">En reparación ahora</p>
-                                                    <p className="text-[9px] text-slate-400">de {indisponibilidad.totalMoldes} totales</p>
-                                                </div>
-                                            </div>
-                                        )}
-                                        {!indisponibilidad && !indispLoading && (
-                                            <p className="text-[9px] text-slate-400 italic">Sin datos para la referencia seleccionada en este período.</p>
-                                        )}
-                                    </div>
-                                )}
 
                                 {/* Pareto Chart Section */}
                                 {selectedCat === 'Todos' && <ParetoChart rows={stats.comprometidos} />}
