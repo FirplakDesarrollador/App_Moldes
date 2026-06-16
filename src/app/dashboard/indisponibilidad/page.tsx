@@ -1,9 +1,9 @@
 // PV_MOLDES V2.4
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Activity, Loader2, AlertCircle, CheckCircle2, BarChart3, Package } from 'lucide-react'
+import { Activity, Loader2, AlertCircle, CheckCircle2, BarChart3, Package, Search, X } from 'lucide-react'
 import { indicatorsService, IndisponibilidadResult } from '@/services/indicators.service'
 import Navbar from '@/components/layout/Navbar'
 
@@ -17,10 +17,14 @@ export default function IndisponibilidadPage() {
     })
     const [referenciasOptions, setReferenciasOptions] = useState<string[]>([])
     const [selectedReferencia, setSelectedReferencia] = useState('')
+    const [searchInput, setSearchInput] = useState('')
+    const [showDropdown, setShowDropdown] = useState(false)
     const [result, setResult] = useState<IndisponibilidadResult | null>(null)
     const [loading, setLoading] = useState(false)
     const [refLoading, setRefLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+
+    const comboRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
         const stored = localStorage.getItem('moldapp_user')
@@ -31,6 +35,38 @@ export default function IndisponibilidadPage() {
             .catch(console.error)
             .finally(() => setRefLoading(false))
     }, [router])
+
+    // Close dropdown on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (comboRef.current && !comboRef.current.contains(e.target as Node)) {
+                setShowDropdown(false)
+            }
+        }
+        document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [])
+
+    const filteredOptions = useMemo(() => {
+        const q = searchInput.toLowerCase().trim()
+        if (!q) return referenciasOptions
+        return referenciasOptions.filter(r => r.toLowerCase().includes(q))
+    }, [searchInput, referenciasOptions])
+
+    const handleSelectRef = (ref: string) => {
+        setSelectedReferencia(ref)
+        setSearchInput(ref)
+        setShowDropdown(false)
+        setResult(null)
+        setError(null)
+    }
+
+    const handleClearRef = () => {
+        setSelectedReferencia('')
+        setSearchInput('')
+        setResult(null)
+        setError(null)
+    }
 
     const handleCalcular = async () => {
         if (!selectedReferencia) { setError('Selecciona una referencia de molde.'); return }
@@ -75,33 +111,77 @@ export default function IndisponibilidadPage() {
                             </div>
                         ))}
 
-                        <div className="space-y-1.5">
+                        {/* Combobox referencia */}
+                        <div className="space-y-1.5 flex-1 min-w-[260px]" ref={comboRef}>
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
                                 Referencia de molde
                             </label>
-                            {refLoading ? (
-                                <div className="flex items-center gap-2 py-3 px-5 border border-slate-200 rounded-xl bg-slate-50 min-w-[260px]">
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-                                    <span className="text-xs text-slate-400">Cargando referencias...</span>
-                                </div>
-                            ) : (
-                                <select
-                                    className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-3 px-5 text-xs font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-violet-500/30 min-w-[260px]"
-                                    value={selectedReferencia}
-                                    onChange={e => { setSelectedReferencia(e.target.value); setResult(null); setError(null) }}
+                            <div className="relative">
+                                <div className={`flex items-center gap-2 bg-white dark:bg-slate-950 border rounded-xl px-4 py-3 transition-all
+                                    ${showDropdown ? 'border-violet-400 ring-2 ring-violet-500/20' : 'border-slate-200 dark:border-slate-800'}
+                                    ${selectedReferencia ? 'border-violet-300' : ''}`}
                                 >
-                                    <option value="">— Seleccionar referencia —</option>
-                                    {referenciasOptions.map(ref => (
-                                        <option key={ref} value={ref}>{ref}</option>
-                                    ))}
-                                </select>
-                            )}
+                                    {refLoading
+                                        ? <Loader2 className="w-3.5 h-3.5 text-slate-400 animate-spin shrink-0" />
+                                        : <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                    }
+                                    <input
+                                        type="text"
+                                        placeholder={refLoading ? 'Cargando referencias...' : 'Buscar referencia...'}
+                                        disabled={refLoading}
+                                        className="flex-1 bg-transparent text-xs font-bold text-slate-900 dark:text-white outline-none placeholder:text-slate-400 placeholder:font-normal min-w-0"
+                                        value={searchInput}
+                                        onChange={e => {
+                                            setSearchInput(e.target.value)
+                                            setSelectedReferencia('')
+                                            setShowDropdown(true)
+                                            setResult(null)
+                                        }}
+                                        onFocus={() => setShowDropdown(true)}
+                                    />
+                                    {searchInput && (
+                                        <button onClick={handleClearRef} className="shrink-0 p-0.5 rounded-full hover:bg-slate-100 transition-colors">
+                                            <X className="w-3 h-3 text-slate-400" />
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Dropdown */}
+                                {showDropdown && !refLoading && (
+                                    <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl overflow-hidden">
+                                        {filteredOptions.length === 0 ? (
+                                            <div className="px-5 py-4 text-[10px] text-slate-400 font-bold uppercase">
+                                                Sin resultados para "{searchInput}"
+                                            </div>
+                                        ) : (
+                                            <ul className="max-h-56 overflow-y-auto divide-y divide-slate-50 dark:divide-slate-800">
+                                                {filteredOptions.map(ref => (
+                                                    <li key={ref}>
+                                                        <button
+                                                            onMouseDown={e => { e.preventDefault(); handleSelectRef(ref) }}
+                                                            className={`w-full text-left px-5 py-3 text-xs font-bold hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors
+                                                                ${selectedReferencia === ref ? 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-300' : 'text-slate-700 dark:text-slate-300'}`}
+                                                        >
+                                                            {ref}
+                                                        </button>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                        <div className="px-5 py-2 bg-slate-50 dark:bg-slate-950 border-t border-slate-100 dark:border-slate-800">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                                {filteredOptions.length} de {referenciasOptions.length} referencias
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         <button
                             onClick={handleCalcular}
                             disabled={loading || !selectedReferencia}
-                            className="ml-auto px-8 py-3 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-black rounded-xl transition-all shadow-lg shadow-violet-600/20 text-[10px] uppercase tracking-[0.2em] flex items-center gap-2"
+                            className="px-8 py-3 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-black rounded-xl transition-all shadow-lg shadow-violet-600/20 text-[10px] uppercase tracking-[0.2em] flex items-center gap-2 whitespace-nowrap"
                         >
                             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
                             Calcular
@@ -117,17 +197,24 @@ export default function IndisponibilidadPage() {
                 </div>
 
                 {/* ── Resultados ── */}
+                {loading && (
+                    <div className="flex flex-col items-center gap-4 py-16">
+                        <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
+                        <p className="text-xs font-black uppercase tracking-widest text-slate-400">Calculando...</p>
+                    </div>
+                )}
+
                 {result && !loading && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
 
-                        {/* Título referencia */}
+                        {/* Encabezado referencia */}
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-violet-100 dark:bg-violet-900/30 rounded-xl">
                                 <Package className="w-5 h-5 text-violet-500" />
                             </div>
                             <div>
                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Referencia analizada</p>
-                                <p className="text-sm font-black text-slate-800 dark:text-white uppercase">{selectedReferencia}</p>
+                                <p className="text-sm font-black text-slate-800 dark:text-white uppercase leading-tight">{selectedReferencia}</p>
                             </div>
                         </div>
 
@@ -139,7 +226,7 @@ export default function IndisponibilidadPage() {
                                 </div>
                                 <p className={`text-5xl font-black ${indiceColor}`}>{result.indice.toFixed(1)}%</p>
                                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Índice de Indisponibilidad</p>
-                                <p className="text-[9px] text-slate-400">Días fuera / {result.daysInMonth} días del mes</p>
+                                <p className="text-[9px] text-slate-400">Promedio días fuera / {result.daysInMonth} días del mes</p>
                             </div>
 
                             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 rounded-[2.5rem] shadow-sm flex flex-col items-center gap-3 text-center">
@@ -148,7 +235,7 @@ export default function IndisponibilidadPage() {
                                 </div>
                                 <p className="text-5xl font-black text-slate-700 dark:text-white">{result.promedioDiasFuera.toFixed(1)}</p>
                                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Promedio días fuera</p>
-                                <p className="text-[9px] text-slate-400">por molde en el período</p>
+                                <p className="text-[9px] text-slate-400">por molde · {result.totalMoldes} moldes en referencia</p>
                             </div>
 
                             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 rounded-[2.5rem] shadow-sm flex flex-col items-center gap-3 text-center">
@@ -157,7 +244,7 @@ export default function IndisponibilidadPage() {
                                 </div>
                                 <p className="text-5xl font-black text-orange-500">{result.enReparacionActual}</p>
                                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">En reparación ahora</p>
-                                <p className="text-[9px] text-slate-400">de {result.totalMoldes} moldes de esta referencia</p>
+                                <p className="text-[9px] text-slate-400">de {result.totalMoldes} totales</p>
                             </div>
                         </div>
 
