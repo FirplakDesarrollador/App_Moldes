@@ -101,15 +101,14 @@ function deduplicateHistoricalRecords(records: HistoricalMoldRaw[]): HistoricalM
     records.forEach(r => {
         const norm = (s: string | null) => (s || '').trim().toUpperCase().replace(/,+$/, '').trim()
 
-        // Soporte para ambos formatos de nombre (snake_case y ESPACIOS MAYÚSCULAS)
         const codigo = r.codigo_molde || r['CODIGO MOLDE'] || '';
         const fecha = r.fecha_entrada || r['FECHA ENTRADA'] || '';
-        const tipo = r.tipo_de_reparacion || r['Tipo de reparacion'] || '';
 
-        const tipoNorm = norm(tipo).replace('Á', 'A').replace('É', 'E').replace('Í', 'I').replace('Ó', 'O').replace('Ú', 'U');
-        
-        // Clave única robusta
-        const key = `${norm(codigo)}|${fecha}|${tipoNorm}`
+        // Clave por (codigo + fecha_entrada). Se excluye el tipo para evitar que
+        // variaciones menores en el nombre del tipo generen duplicados donde el
+        // registro "En reparacion" y el registro "Entregado" del mismo evento
+        // tengan claves distintas y el "En reparacion" gane en los indicadores.
+        const key = `${norm(codigo)}|${fecha}`
 
         if (!eventGroups[key]) {
             eventGroups[key] = r
