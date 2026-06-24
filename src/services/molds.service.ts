@@ -82,6 +82,24 @@ export const moldsService = {
         return data
     },
 
+    // Busca en la tabla maestra 'moldes' por referencia o serial
+    async searchMoldesMaestro(query: string): Promise<{ serial: string; nombre_articulo: string; estado: string }[]> {
+        if (!query.trim()) return []
+        const supabase = createClient()
+        const term = `%${query.trim()}%`
+        const { data } = await supabase
+            .from('moldes')
+            .select('serial, nombre_articulo, estado')
+            .or(`nombre_articulo.ilike.${term},serial.ilike.${term}`)
+            .order('nombre_articulo', { ascending: true })
+            .limit(200)
+        return (data || []).map((r: any) => ({
+            serial: r.serial || '',
+            nombre_articulo: r.nombre_articulo || '',
+            estado: r.estado || '',
+        }))
+    },
+
     // SEARCH: Buscador Rápido (Dashboard) connects to BD_moldes (Requirement 2.4 / 2.3)
     async searchMolds(query: string) {
         if (!query.trim()) return []

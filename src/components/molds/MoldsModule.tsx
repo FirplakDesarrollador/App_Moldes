@@ -1,10 +1,137 @@
 
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { Search, Loader2, Package, Clock, Filter, AlertCircle } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { Search, Loader2, Package, Clock, Filter, AlertCircle, X } from 'lucide-react'
 import { moldsService } from '@/services/molds.service'
 
+// ── Panel buscador de inventario maestro ─────────────────────────────────────
+function MoldesMaestroSearch() {
+    const [query, setQuery] = useState('')
+    const [results, setResults] = useState<{ serial: string; nombre_articulo: string; estado: string }[]>([])
+    const [loading, setLoading] = useState(false)
+    const inputRef = useRef<HTMLInputElement>(null)
+
+    useEffect(() => {
+        const q = query.trim()
+        if (q.length < 2) { setResults([]); return }
+        const timer = setTimeout(async () => {
+            setLoading(true)
+            try { setResults(await moldsService.searchMoldesMaestro(q)) }
+            catch (e) { console.error(e) }
+            finally { setLoading(false) }
+        }, 350)
+        return () => clearTimeout(timer)
+    }, [query])
+
+    const totalMoldes = results.length
+    const activosMoldes = useMemo(
+        () => results.filter(r => !(r.estado || '').toLowerCase().includes('destruido')).length,
+        [results]
+    )
+
+    const getEstadoBadge = (estado: string) => {
+        const e = (estado || '').toLowerCase()
+        if (e.includes('destruido'))  return 'bg-slate-100 text-slate-500 border-slate-200'
+        if (e.includes('disponible') || e.includes('activo') || e.includes('ok'))
+                                      return 'bg-green-50 text-green-600 border-green-200'
+        if (e.includes('reparacion') || e.includes('espera'))
+                                      return 'bg-blue-50 text-blue-600 border-blue-200'
+        return 'bg-slate-50 text-slate-500 border-slate-200'
+    }
+
+    return (
+        <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm p-6 space-y-5">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h3 className="text-sm font-black flex items-center gap-2 text-slate-800 dark:text-white">
+                        <Package className="w-4 h-4 text-blue-500" />
+                        Inventario de moldes
+                    </h3>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Busca por referencia o código serial</p>
+                </div>
+                {totalMoldes > 0 && (
+                    <div className="flex items-center gap-4">
+                        <div className="text-center">
+                            <p className="text-3xl font-black text-blue-600">{totalMoldes}</p>
+                            <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Total</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-3xl font-black text-green-500">{activosMoldes}</p>
+                            <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Activos</p>
+                        </div>
+                        {totalMoldes - activosMoldes > 0 && (
+                            <div className="text-center">
+                                <p className="text-3xl font-black text-slate-400">{totalMoldes - activosMoldes}</p>
+                                <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Destruidos</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Input búsqueda */}
+            <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                    ref={inputRef}
+                    type="text"
+                    placeholder="Ej: MESON COCINA, 209-06..."
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl py-3 pl-11 pr-10 text-xs font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
+                    value={query}
+                    onChange={e => setQuery(e.target.value)}
+                />
+                {loading && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-blue-400 animate-spin" />}
+                {!loading && query && (
+                    <button onClick={() => { setQuery(''); setResults([]) }}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-slate-100">
+                        <X className="w-3 h-3 text-slate-400" />
+                    </button>
+                )}
+            </div>
+
+            {/* Resultados */}
+            {query.trim().length >= 2 && !loading && results.length === 0 && (
+                <p className="text-[10px] text-slate-400 font-bold italic text-center py-4">Sin moldes para "{query}"</p>
+            )}
+
+            {results.length > 0 && (
+                <div className="overflow-hidden rounded-2xl border border-slate-100 dark:border-slate-800">
+                    <div className="max-h-64 overflow-y-auto">
+                        <table className="w-full text-left">
+                            <thead className="sticky top-0 bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800">
+                                <tr>
+                                    {['Código', 'Referencia', 'Estado'].map(h => (
+                                        <th key={h} className="py-2.5 px-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">{h}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50 dark:divide-slate-800/60">
+                                {results.map(r => (
+                                    <tr key={r.serial} className="hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-colors">
+                                        <td className="py-2.5 px-4">
+                                            <span className="font-mono text-[10px] font-black text-slate-600 dark:text-slate-300">{r.serial}</span>
+                                        </td>
+                                        <td className="py-2.5 px-4">
+                                            <span className="text-xs font-bold text-slate-800 dark:text-white uppercase leading-tight">{r.nombre_articulo}</span>
+                                        </td>
+                                        <td className="py-2.5 px-4">
+                                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-black border uppercase ${getEstadoBadge(r.estado)}`}>
+                                                {r.estado || '—'}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ── Módulo principal histórico ────────────────────────────────────────────────
 export default function MoldsModule() {
     const [records, setRecords] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
@@ -15,7 +142,6 @@ export default function MoldsModule() {
     const fetchHistory = useCallback(async () => {
         setLoading(true)
         try {
-            // Updated to fetch from the NEW table 'base_datos_historico_moldes'
             const data = await moldsService.getHistoryFromHistoricoTable(100, 0, searchQuery, {
                 defecto: defectFilter,
                 tipo_reparacion: typeFilter
@@ -29,9 +155,7 @@ export default function MoldsModule() {
     }, [searchQuery, defectFilter, typeFilter])
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            fetchHistory()
-        }, 500)
+        const timer = setTimeout(() => { fetchHistory() }, 500)
         return () => clearTimeout(timer)
     }, [fetchHistory])
 
@@ -55,6 +179,10 @@ export default function MoldsModule() {
                 </div>
             </div>
 
+            {/* ── Buscador inventario maestro ── */}
+            <MoldesMaestroSearch />
+
+            {/* ── Buscador histórico reparaciones ── */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="glass-card p-4 rounded-2xl border border-black/5 dark:border-white/5 relative group">
                     <Search className="absolute left-8 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500" />
