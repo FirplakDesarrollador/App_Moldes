@@ -274,19 +274,39 @@ export const moldsService = {
         }))
     },
 
-    // SEARCH: Master 'moldes' table still used for reference or creation
+    // SEARCH: Master 'moldes' table — returns individual copies (higher limit for model grouping)
     async searchMoldsMaster(query: string) {
         if (!query.trim()) return []
         const supabase = createClient()
         const term = `%${query.trim()}%`
         const { data, error } = await supabase
             .from('moldes')
-            .select('*')
+            .select('serial, nombre_articulo, estado')
             .or(`nombre_articulo.ilike.${term},serial.ilike.${term}`)
-            .limit(10)
-            
+            .order('nombre_articulo', { ascending: true })
+            .limit(100)
+
         if (error) return []
+        return data || []
+    },
+
+    // SEARCH: Unique model names from base_datos_historico_moldes.titulo
+    async searchModelosTitulos(query: string): Promise<string[]> {
+        if (!query.trim()) return []
+        const supabase = createClient()
+        const term = `%${query.trim()}%`
+        const { data } = await supabase
+            .from('base_datos_historico_moldes')
+            .select('titulo')
+            .ilike('titulo', term)
+            .not('titulo', 'is', null)
+            .order('titulo', { ascending: true })
+            .limit(100)
+        if (!data) return []
+        const seen = new Set<string>()
         return data
+            .map((r: any) => (r.titulo || '').trim())
+            .filter((t: string) => { if (!t || seen.has(t)) return false; seen.add(t); return true })
     },
 
     // Get defects from 'Defectos_moldes' with tiempo info

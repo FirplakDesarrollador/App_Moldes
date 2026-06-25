@@ -48,6 +48,7 @@ export default function RawMaterialConsumption() {
     })
 
     const [moldsSearchResults, setMoldsSearchResults] = useState<any[]>([])
+    const [modelsResults, setModelsResults] = useState<{ nombre_articulo: string; count: number }[]>([])
     const [moldSearchTerm, setMoldSearchTerm] = useState('')
     const [showMoldResults, setShowMoldResults] = useState(false)
     const [isSearchingMolds, setIsSearchingMolds] = useState(false)
@@ -206,14 +207,19 @@ export default function RawMaterialConsumption() {
         setMoldSearchTerm(val)
         if (val.length < 2) {
             setMoldsSearchResults([])
+            setModelsResults([])
             setShowMoldResults(false)
             return
         }
         setIsSearchingMolds(true)
         setShowMoldResults(true)
         try {
-            const results = await moldsService.searchMoldsMaster(val)
-            setMoldsSearchResults(results || [])
+            const [copies, titulos] = await Promise.all([
+                moldsService.searchMoldsMaster(val),
+                moldsService.searchModelosTitulos(val),
+            ])
+            setModelsResults(titulos.map(t => ({ nombre_articulo: t, count: 0 })))
+            setMoldsSearchResults(copies || [])
         } catch (e) {
             console.error(e)
         } finally {
@@ -222,12 +228,22 @@ export default function RawMaterialConsumption() {
     }
 
     const selectMold = (m: any) => {
-        setFormData(prev => ({ 
-            ...prev, 
+        setFormData(prev => ({
+            ...prev,
             relacion_molde: m.serial,
-            relacion_molde_nombre: m.nombre_articulo 
+            relacion_molde_nombre: m.nombre_articulo
         }))
         setMoldSearchTerm(`${m.serial} - ${m.nombre_articulo}`)
+        setShowMoldResults(false)
+    }
+
+    const selectModel = (nombre_articulo: string) => {
+        setFormData(prev => ({
+            ...prev,
+            relacion_molde: '',
+            relacion_molde_nombre: nombre_articulo
+        }))
+        setMoldSearchTerm(nombre_articulo)
         setShowMoldResults(false)
     }
 
@@ -386,24 +402,46 @@ export default function RawMaterialConsumption() {
                                     />
                                     <Search className="absolute right-10 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                                     
-                                    {showMoldResults && (moldsSearchResults.length > 0 || isSearchingMolds) && (
-                                        <div className="absolute top-full left-0 right-0 mt-4 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl z-50 p-4 max-h-60 overflow-y-auto">
+                                    {showMoldResults && (moldsSearchResults.length > 0 || modelsResults.length > 0 || isSearchingMolds) && (
+                                        <div className="absolute top-full left-0 right-0 mt-4 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl z-50 p-4 max-h-72 overflow-y-auto">
                                             {isSearchingMolds ? (
                                                 <div className="flex items-center justify-center py-4">
                                                     <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
                                                 </div>
                                             ) : (
-                                                moldsSearchResults.map(m => (
-                                                    <button
-                                                        key={m.id}
-                                                        type="button"
-                                                        onClick={() => selectMold(m)}
-                                                        className="w-full text-left p-4 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-2xl transition-all border-b border-slate-50 dark:border-slate-800 last:border-0"
-                                                    >
-                                                        <div className="text-xs font-black text-slate-900 dark:text-white uppercase">{m.serial}</div>
-                                                        <div className="text-[10px] font-bold text-slate-500 uppercase truncate">{m.nombre_articulo}</div>
-                                                    </button>
-                                                ))
+                                                <>
+                                                    {modelsResults.length > 0 && (
+                                                        <>
+                                                            <div className="text-[9px] font-black uppercase tracking-widest text-blue-500 px-2 pb-1">Modelos / Referencias</div>
+                                                            {modelsResults.map(model => (
+                                                                <button
+                                                                    key={model.nombre_articulo}
+                                                                    type="button"
+                                                                    onClick={() => selectModel(model.nombre_articulo)}
+                                                                    className="w-full text-left p-3 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-2xl transition-all"
+                                                                >
+                                                                    <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase">{model.nombre_articulo}</span>
+                                                                </button>
+                                                            ))}
+                                                        </>
+                                                    )}
+                                                    {moldsSearchResults.length > 0 && (
+                                                        <>
+                                                            <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 px-2 pt-2 pb-1 mt-1 border-t border-slate-100 dark:border-slate-800">Copias específicas</div>
+                                                            {moldsSearchResults.map(m => (
+                                                                <button
+                                                                    key={m.serial}
+                                                                    type="button"
+                                                                    onClick={() => selectMold(m)}
+                                                                    className="w-full text-left p-3 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-2xl transition-all"
+                                                                >
+                                                                    <div className="text-xs font-black text-slate-900 dark:text-white uppercase">{m.serial}</div>
+                                                                    <div className="text-[10px] font-bold text-slate-500 uppercase truncate">{m.nombre_articulo}</div>
+                                                                </button>
+                                                            ))}
+                                                        </>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                     )}
