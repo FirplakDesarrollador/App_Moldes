@@ -204,9 +204,20 @@ export const moldsService = {
         }
 
         // 3. Desduplicar por codigo_molde (un resultado por molde) y ordenar por similitud
+        // Nota: el registro más reciente de un molde puede haberse guardado con el
+        // título en blanco (error de captura). En ese caso, rescatamos el último
+        // título no vacío entre las demás apariciones de ese código.
         const seen = new Set<string>()
         const results: any[] = []
         const queryLower = query.trim().toLowerCase()
+
+        const tituloPorCodigo: Record<string, string> = {}
+        for (const m of (historicoData || [])) {
+            const key = (m.codigo_molde || '').trim().toUpperCase()
+            if (!tituloPorCodigo[key] && m.titulo && m.titulo.trim()) {
+                tituloPorCodigo[key] = m.titulo
+            }
+        }
 
         for (const m of (historicoData || [])) {
             const key = (m.codigo_molde || '').trim().toUpperCase()
@@ -217,13 +228,37 @@ export const moldsService = {
             results.push({
                 ...m,
                 id: m.id,
-                titulo: m.titulo,
+                titulo: m.titulo && m.titulo.trim() ? m.titulo : (tituloPorCodigo[key] || m.titulo),
                 codigo_molde: m.codigo_molde,
                 defectos_a_reparar: m.defectos_a_reparar,
                 // Estado, tipo y responsable del registro MÁS RECIENTE en BD_moldes
                 estado: bdRecord["ESTADO"] || m.estado || '',
                 tipo_de_reparacion: bdRecord["Tipo de reparacion"] || m.tipo_de_reparacion || '',
                 responsable: bdRecord["Responsable"] || m.responsable || '',
+            })
+        }
+
+        // 4. Fallback final: si sigue sin título, buscar en la tabla maestra 'moldes'
+        const sinTitulo = results.filter(r => !r.titulo || !r.titulo.trim())
+        if (sinTitulo.length > 0) {
+            const codigosSinTitulo = sinTitulo.map(r => (r.codigo_molde || '').trim())
+            const { data: maestroData } = await supabase
+                .from('moldes')
+                .select('serial, nombre_articulo')
+                .in('serial', codigosSinTitulo)
+
+            const maestroMap: Record<string, string> = {}
+            ;(maestroData || []).forEach((r: any) => {
+                if (r.nombre_articulo && r.nombre_articulo.trim()) {
+                    maestroMap[(r.serial || '').trim().toUpperCase()] = r.nombre_articulo
+                }
+            })
+
+            results.forEach(r => {
+                if (!r.titulo || !r.titulo.trim()) {
+                    const key = (r.codigo_molde || '').trim().toUpperCase()
+                    if (maestroMap[key]) r.titulo = maestroMap[key]
+                }
             })
         }
 
