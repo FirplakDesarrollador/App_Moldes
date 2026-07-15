@@ -636,7 +636,7 @@ export const indicatorsService = {
         const moldesEntregados = entregadosRows.length
 
         const productividad   = metaTotal > 0       ? totalMoldesReparados / metaTotal    : 0
-        const nivelServicio   = moldesEsperados > 0  ? moldesEntregados / moldesEsperados  : 0
+        const nivelServicio   = moldesEsperados > 0  ? moldesEntregados / moldesEsperados  : 1
         const productividadHH = totalOperarios > 0   ? totalMoldesReparados / totalOperarios : 0
 
         return {

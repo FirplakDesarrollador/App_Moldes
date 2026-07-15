@@ -268,7 +268,7 @@ export default function IndicatorsPage() {
         const productividad = (numOps > 0) ? (entregadosEnRango / numOps) : 0
         return {
             comprometidos: total, entregadosEnRango, cumplieron, pendientes,
-            nivel: total > 0 ? (cumplieron / total) * 100 : 0,
+            nivel: total > 0 ? (cumplieron / total) * 100 : 100,
             productividad, hasOps: numOps > 0,
         }
     }, [filteredComp, filteredEntr, numOperarios])
