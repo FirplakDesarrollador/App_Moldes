@@ -197,6 +197,24 @@ export interface IndisponibilidadRow extends IndisponibilidadResult {
 }
 
 export const indicatorsService = {
+    /** Devuelve un mapa DESCRIPCIÓN (nombre_articulo) → Número de Artículo SAP (ItemCode). */
+    async getSapItemCodeMap(): Promise<Record<string, string>> {
+        try {
+            const res = await fetch('/api/sap-items')
+            const data = await res.json()
+            if (!res.ok || !data.success) return {}
+            const map: Record<string, string> = {}
+            for (const item of (data.items || [])) {
+                const desc = (item.ItemDescription || '').trim().toUpperCase()
+                if (desc && !map[desc]) map[desc] = item.ItemCode
+            }
+            return map
+        } catch (e) {
+            console.error('Error fetching SAP item code map:', e)
+            return {}
+        }
+    },
+
     /** Devuelve los nombres únicos de referencias de moldes (para el selector). */
     async getReferencias(): Promise<string[]> {
         const supabase = createClient()

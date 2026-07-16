@@ -32,6 +32,10 @@ export default function IndisponibilidadPage() {
     const [refLoading, setRefLoading] = useState(true)
     const comboRef = useRef<HTMLDivElement>(null)
 
+    // ── Mapa Referencia (nombre_articulo) → Número de Artículo SAP ─────────────
+    const [skuMap, setSkuMap] = useState<Record<string, string>>({})
+    const getSku = (referencia: string) => skuMap[(referencia || '').trim().toUpperCase()] || null
+
     // ── Individual result state ───────────────────────────────────────────────
     const [result, setResult] = useState<IndisponibilidadResult | null>(null)
     const [loading, setLoading] = useState(false)
@@ -50,6 +54,7 @@ export default function IndisponibilidadPage() {
             .then(setReferenciasOptions)
             .catch(console.error)
             .finally(() => setRefLoading(false))
+        indicatorsService.getSapItemCodeMap().then(setSkuMap).catch(console.error)
         loadTable(defaultRange)
     }, [router])
 
@@ -99,11 +104,12 @@ export default function IndisponibilidadPage() {
     }
 
     const exportCSV = () => {
-        const lines = ['Referencia,Indice_Indisponibilidad']
+        const lines = ['Numero_Articulo,Referencia,Indice_Indisponibilidad']
         for (const row of tableRows) {
+            const sku = `"${(getSku(row.referencia) || '').replace(/"/g, '""')}"`
             const ref = `"${row.referencia.replace(/"/g, '""')}"`
             const indice = (row.indice / 100).toFixed(4)
-            lines.push(`${ref},${indice}`)
+            lines.push(`${sku},${ref},${indice}`)
         }
         const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
         const url = URL.createObjectURL(blob)
@@ -235,6 +241,9 @@ export default function IndisponibilidadPage() {
                             <div>
                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Referencia analizada</p>
                                 <p className="text-sm font-black text-slate-800 dark:text-white uppercase leading-tight">{selectedReferencia}</p>
+                                {getSku(selectedReferencia) && (
+                                    <p className="text-[10px] font-bold text-violet-500 mt-0.5">{getSku(selectedReferencia)}</p>
+                                )}
                             </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -322,10 +331,10 @@ export default function IndisponibilidadPage() {
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full text-left min-w-[700px]">
+                            <table className="w-full text-left min-w-[860px]">
                                 <thead>
                                     <tr className="bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800">
-                                        {['#', 'Referencia', 'Moldes', 'Días prom. fuera', 'Índice', 'En reparación'].map(h => (
+                                        {['#', 'Número de Artículo', 'Referencia', 'Moldes', 'Días prom. fuera', 'Índice', 'En reparación'].map(h => (
                                             <th key={h} className="py-3 px-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">{h}</th>
                                         ))}
                                     </tr>
@@ -339,6 +348,7 @@ export default function IndisponibilidadPage() {
                                                 onClick={() => { handleSelectRef(row.referencia); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
                                             >
                                                 <td className="py-4 px-5 text-[10px] font-black text-slate-400">{i + 1}</td>
+                                                <td className="py-4 px-5 text-[10px] font-bold text-violet-500 whitespace-nowrap">{getSku(row.referencia) || '—'}</td>
                                                 <td className="py-4 px-5">
                                                     <p className="text-xs font-black text-slate-800 dark:text-white uppercase leading-tight">{row.referencia}</p>
                                                 </td>
