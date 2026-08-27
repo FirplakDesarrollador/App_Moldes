@@ -604,17 +604,11 @@ export const moldsService = {
         let saved: any
         const now = new Date().toISOString()
         const codigoMolde = (record.codigo_molde || '').trim()
-        const titulo = String(record.titulo || '').trim()
-
-        if (!titulo) {
-            throw new Error('El título del modelo es obligatorio')
-        }
 
         // 1. Construir el objeto para BD_moldes
         const dbRecord: any = {
-            "Título": titulo,
-            // Los modelos sin código se guardan como NULL para que puedan coexistir.
-            "CODIGO MOLDE": codigoMolde || null,
+            "Título": record.titulo,
+            "CODIGO MOLDE": codigoMolde,
             "DEFECTOS A REPARAR": record.defectos_a_reparar,
             "FECHA ENTRADA": record.fecha_entrada,
             "FECHA ESPERADA": record.fecha_esperada,
@@ -639,33 +633,24 @@ export const moldsService = {
             // Caso Edición: Intentar recuperar ID existente
             if (!repairEventId) {
                 // Buscar en el registro actual de BD_moldes
-                let currentQuery = supabase
+                const { data: current } = await supabase
                     .from('BD_moldes')
                     .select('repair_event_id')
-
-                currentQuery = record.id
-                    ? currentQuery.eq('id', record.id)
-                    : currentQuery.eq('Título', titulo)
-
-                const { data: current } = await currentQuery.limit(1);
+                    .ilike('CODIGO MOLDE', codigoMolde)
+                    .limit(1);
                 
                 repairEventId = current?.[0]?.repair_event_id;
 
                 if (!repairEventId) {
                     // Si aún no tiene (registro viejo), buscar en histórico por clave lógica antes de crear uno nuevo
-                    let historyQuery = supabase
+                    const { data: hist } = await supabase
                         .from('base_datos_historico_moldes')
                         .select('repair_event_id')
-                        .eq('titulo', titulo)
+                        .eq('codigo_molde', codigoMolde)
                         .eq('fecha_entrada', record.fecha_entrada)
                         .not('repair_event_id', 'is', null)
                         .order('id', { ascending: false })
-
-                    if (codigoMolde) {
-                        historyQuery = historyQuery.eq('codigo_molde', codigoMolde)
-                    }
-
-                    const { data: hist } = await historyQuery.limit(1);
+                        .limit(1);
                     
                     repairEventId = hist?.[0]?.repair_event_id || crypto.randomUUID();
                 }
@@ -675,21 +660,21 @@ export const moldsService = {
 
         // REGLA: La fecha de entrega debe ser NULL si el estado no es uno de los estados de "finalizado/entregado"
         const estadoNorm = (record.estado || '').toLowerCase().trim();
-        const estadosConEntrega = ['entregado'];
+        const estadosConEntrega = ['entregado', 'activo', 'disponible', 'ok', 'destruido'];
         
         if (!estadosConEntrega.includes(estadoNorm)) {
             dbRecord["FECHA ENTREGA"] = null;
         }
 
-        // 2. LÓGICA DE GUARDADO.
-        // El Título exacto es la clave funcional. CODIGO MOLDE es opcional y no se usa
-        // para decidir qué fila actualizar cuando se crea un modelo.
+        // 2. LÓGICA DE GUARDADO — Regla: un único registro por CODIGO MOLDE en BD_moldes.
+        // Si ya existe cualquier registro para este código → UPDATE. Solo INSERT si no existe ninguno.
+        // isNew siempre parte de null para forzar la búsqueda en BD_moldes.
         let existingId = isNew ? null : (record.id || null);
         if (!existingId) {
             const { data: existingData } = await supabase
                 .from('BD_moldes')
                 .select('id')
-                .eq('Título', titulo)
+                .ilike('CODIGO MOLDE', codigoMolde)
                 .limit(1);
 
             if (existingData && existingData.length > 0) {
@@ -713,7 +698,17 @@ export const moldsService = {
             }
             saved = data?.[0]
 
-            // Guardar o editar nunca elimina otras filas de BD_moldes.
+            // Eliminar cualquier duplicado del mismo CODIGO MOLDE (registros distintos al que se acaba de actualizar)
+            const { data: dupes } = await supabase
+                .from('BD_moldes')
+                .select('id')
+                .ilike('CODIGO MOLDE', codigoMolde)
+                .neq('id', existingId)
+            if (dupes && dupes.length > 0) {
+                const dupeIds = dupes.map((d: any) => d.id)
+                console.log(`[saveRegistro] Eliminando ${dupeIds.length} registro(s) duplicado(s) de BD_moldes para CODIGO: "${codigoMolde}"`)
+                await supabase.from('BD_moldes').delete().in('id', dupeIds)
+            }
         } else {
             // INSERT: Registro totalmente nuevo
             console.log(`[saveRegistro] INSERTANDO NUEVO en BD_moldes → CODIGO: "${codigoMolde}"`)
@@ -736,8 +731,8 @@ export const moldsService = {
         // 3. HISTÓRICO: SIEMPRE INSERT (es un log completo de cambios)
         const historicoRecord = {
             id: Date.now() + 10, // ID único manual para histórico
-            titulo,
-            codigo_molde: codigoMolde || null,
+            titulo: record.titulo,
+            codigo_molde: codigoMolde,
             defectos_a_reparar: record.defectos_a_reparar,
             fecha_entrada: record.fecha_entrada,
             fecha_esperada: record.fecha_esperada,
