@@ -53,6 +53,20 @@ function normalizeRepairType(val: any): string {
     return str;
 }
 
+function normalizeMoldStatus(val: any): string {
+    return String(val || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[-_]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+}
+
+function isWaitingForMolds(val: any): boolean {
+    return normalizeMoldStatus(val) === 'en espera moldes'
+}
+
 export const moldsService = {
     async checkActiveRepairsForMold(codigoMolde: string): Promise<{ tipo: string; estado: string }[]> {
         const supabase = createClient()
@@ -651,15 +665,16 @@ export const moldsService = {
             dbRecord["FECHA ENTREGA"] = null;
         }
 
-        // 2. LÓGICA DE GUARDADO — Regla: un único registro por CODIGO MOLDE en BD_moldes.
-        // Si ya existe cualquier registro para este código → UPDATE. Solo INSERT si no existe ninguno.
-        // isNew siempre parte de null para forzar la búsqueda en BD_moldes.
+        // 2. LÓGICA DE GUARDADO.
+        // Un código puede tener modelos distintos. Al crear, solo se reutiliza una fila cuando
+        // también coincide exactamente el nombre del modelo; de lo contrario se inserta otra fila.
         let existingId = isNew ? null : (record.id || null);
         if (!existingId) {
             const { data: existingData } = await supabase
                 .from('BD_moldes')
                 .select('id')
                 .ilike('CODIGO MOLDE', codigoMolde)
+                .eq('Título', record.titulo)
                 .limit(1);
 
             if (existingData && existingData.length > 0) {
@@ -683,16 +698,26 @@ export const moldsService = {
             }
             saved = data?.[0]
 
-            // Eliminar cualquier duplicado del mismo CODIGO MOLDE (registros distintos al que se acaba de actualizar)
+            // Limpiar solo duplicados realmente cerrados del MISMO modelo.
+            // Nunca eliminar otro nombre de modelo, una fila en espera de moldes ni una fila sin entrega.
             const { data: dupes } = await supabase
                 .from('BD_moldes')
-                .select('id')
+                .select('id, "Título", ESTADO, "FECHA ENTREGA"')
                 .ilike('CODIGO MOLDE', codigoMolde)
+                .eq('Título', record.titulo)
                 .neq('id', existingId)
             if (dupes && dupes.length > 0) {
-                const dupeIds = dupes.map((d: any) => d.id)
-                console.log(`[saveRegistro] Eliminando ${dupeIds.length} registro(s) duplicado(s) de BD_moldes para CODIGO: "${codigoMolde}"`)
-                await supabase.from('BD_moldes').delete().in('id', dupeIds)
+                const dupeIds = dupes
+                    .filter((d: any) => !isWaitingForMolds(d.ESTADO) && Boolean(d['FECHA ENTREGA']))
+                    .map((d: any) => d.id)
+
+                if (dupeIds.length > 0) {
+                    console.log(`[saveRegistro] Eliminando ${dupeIds.length} duplicado(s) cerrado(s) de BD_moldes para CODIGO: "${codigoMolde}" y modelo: "${record.titulo}"`)
+                    const { error: deleteError } = await supabase.from('BD_moldes').delete().in('id', dupeIds)
+                    if (deleteError) {
+                        console.warn('[saveRegistro] No se pudieron eliminar duplicados cerrados:', deleteError.message)
+                    }
+                }
             }
         } else {
             // INSERT: Registro totalmente nuevo
