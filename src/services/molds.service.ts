@@ -183,15 +183,21 @@ export const moldsService = {
         // Obtener códigos únicos de la búsqueda en historico
         const codigosUnicos = [...new Set((historicoData || []).map((m: any) => m.codigo_molde?.trim()).filter(Boolean))]
 
-        if (codigosUnicos.length === 0) return []
-
         // 2. Obtener los registros de BD_moldes para todos los códigos en UNA SOLA consulta (Optimización 40k+)
         const bdMoldesMap: Record<string, any> = {}
-        const { data: allBdData, error: bdError } = await supabase
-            .from('BD_moldes')
-            .select('"CODIGO MOLDE", "ESTADO", "Tipo de reparacion", "Responsable", "FECHA ENTRADA"')
-            .in('"CODIGO MOLDE"', codigosUnicos)
-            .order('"FECHA ENTRADA"', { ascending: false })
+        let allBdData: any[] = []
+        let bdError: any = null
+
+        if (codigosUnicos.length > 0) {
+            const response = await supabase
+                .from('BD_moldes')
+                .select('"CODIGO MOLDE", "ESTADO", "Tipo de reparacion", "Responsable", "FECHA ENTRADA"')
+                .in('"CODIGO MOLDE"', codigosUnicos)
+                .order('"FECHA ENTRADA"', { ascending: false })
+
+            allBdData = response.data || []
+            bdError = response.error
+        }
 
         if (!bdError && allBdData) {
             // Procesar en JS para quedarnos con el más reciente de cada uno
@@ -203,7 +209,7 @@ export const moldsService = {
             })
         }
 
-        // 3. Desduplicar por codigo_molde (un resultado por molde) y ordenar por similitud
+        // 3. Desduplicar por título exacto; si no hay título, usar el código.
         // Nota: el registro más reciente de un molde puede haberse guardado con el
         // título en blanco (error de captura). En ese caso, rescatamos el último
         // título no vacío entre las demás apariciones de ese código.
@@ -214,21 +220,23 @@ export const moldsService = {
         const tituloPorCodigo: Record<string, string> = {}
         for (const m of (historicoData || [])) {
             const key = (m.codigo_molde || '').trim().toUpperCase()
-            if (!tituloPorCodigo[key] && m.titulo && m.titulo.trim()) {
+            if (key && !tituloPorCodigo[key] && m.titulo && m.titulo.trim()) {
                 tituloPorCodigo[key] = m.titulo
             }
         }
 
         for (const m of (historicoData || [])) {
-            const key = (m.codigo_molde || '').trim().toUpperCase()
+            const codigoKey = (m.codigo_molde || '').trim().toUpperCase()
+            const tituloKey = (m.titulo || '').trim()
+            const key = tituloKey ? `TITULO:${tituloKey}` : `CODIGO:${codigoKey}`
             if (seen.has(key)) continue
             seen.add(key)
 
-            const bdRecord = bdMoldesMap[key] || {}
+            const bdRecord = bdMoldesMap[codigoKey] || {}
             results.push({
                 ...m,
                 id: m.id,
-                titulo: m.titulo && m.titulo.trim() ? m.titulo : (tituloPorCodigo[key] || m.titulo),
+                titulo: tituloKey || tituloPorCodigo[codigoKey] || m.titulo,
                 codigo_molde: m.codigo_molde,
                 defectos_a_reparar: m.defectos_a_reparar,
                 // Estado, tipo y responsable del registro MÁS RECIENTE en BD_moldes
@@ -241,11 +249,15 @@ export const moldsService = {
         // 4. Fallback final: si sigue sin título, buscar en la tabla maestra 'moldes'
         const sinTitulo = results.filter(r => !r.titulo || !r.titulo.trim())
         if (sinTitulo.length > 0) {
-            const codigosSinTitulo = sinTitulo.map(r => (r.codigo_molde || '').trim())
-            const { data: maestroData } = await supabase
-                .from('moldes')
-                .select('serial, nombre_articulo')
-                .in('serial', codigosSinTitulo)
+            const codigosSinTitulo = sinTitulo
+                .map(r => (r.codigo_molde || '').trim())
+                .filter(Boolean)
+            const { data: maestroData } = codigosSinTitulo.length > 0
+                ? await supabase
+                    .from('moldes')
+                    .select('serial, nombre_articulo')
+                    .in('serial', codigosSinTitulo)
+                : { data: [] }
 
             const maestroMap: Record<string, string> = {}
             ;(maestroData || []).forEach((r: any) => {
@@ -457,10 +469,13 @@ export const moldsService = {
             return []
         }
 
-        // Deduplicar: si BD_moldes tiene varias filas por código, conservar solo la más reciente
+        // Un modelo sin código se identifica por su título exacto. Esto evita ocultar
+        // todos los modelos S/C como si fueran un único registro.
         const seen = new Set<string>()
         const deduped = (data || []).filter((m: any) => {
-            const key = (m["CODIGO MOLDE"] || '').trim().toUpperCase()
+            const titulo = (m["Título"] || '').trim()
+            const codigo = (m["CODIGO MOLDE"] || '').trim().toUpperCase()
+            const key = titulo ? `TITULO:${titulo}` : `CODIGO:${codigo}`
             if (seen.has(key)) return false
             seen.add(key)
             return true
