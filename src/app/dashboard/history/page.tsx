@@ -406,9 +406,9 @@ export default function RegistroMoldesPage() {
             
             fetchInitial(searchTerm, filterView)
             setEditingRecord(null)
-        } catch (error) {
+        } catch (error: any) {
             console.error(error)
-            alert('Error al guardar el registro en la base de datos')
+            alert(error?.message || 'Error al guardar el registro en la base de datos')
         } finally {
             setIsSaving(false)
         }
