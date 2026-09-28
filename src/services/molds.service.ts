@@ -19,6 +19,23 @@ export interface Mold {
     Observaciones_reparacion?: string
     modificado_por?: string
     modified_at?: string
+    [key: string]: any
+}
+
+export interface MoldActive {
+    [key: string]: any
+    id?: any
+    ESTADO?: string
+    Título?: string
+    "CODIGO MOLDE"?: string
+    Prioridad?: string
+    "FECHA ENTRADA"?: string
+    "FECHA ESPERADA"?: string
+    "DEFECTOS A REPARAR"?: string
+    OBSERVACIONES?: string
+    Usuario?: string
+    "Tipo de reparacion"?: string
+    serial?: string
 }
 
 export const moldsService = {
@@ -497,5 +514,33 @@ export const moldsService = {
             throw error
         }
         return data?.[0]
+    },
+
+    async updateStatus(mold: any, newStatus: string, user: string) {
+        const supabase = createClient()
+        const serial = mold.serial || mold["CODIGO MOLDE"]
+        const { error } = await supabase
+            .from('moldes')
+            .update({ 
+                estado: newStatus,
+                modified_at: new Date().toISOString(),
+                modificado_por: user
+            })
+            .eq('serial', serial)
+            
+        if (error) throw error
+    },
+
+    async getCountByReference(nombreReferencia?: string) {
+        if (!nombreReferencia) return 0
+        const supabase = createClient()
+        const { count, error } = await supabase
+            .from('moldes')
+            .select('*', { count: 'exact', head: true })
+            .eq('nombre_articulo', nombreReferencia)
+            .ilike('estado', '%reparacion%')
+
+        if (error) return 0
+        return count || 0
     }
 }
