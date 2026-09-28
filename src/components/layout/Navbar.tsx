@@ -31,7 +31,7 @@ export default function Navbar({
 
     return (
         <nav className="glass-card sticky top-0 z-50 border-x-0 border-t-0 rounded-none bg-opacity-70 dark:bg-opacity-40">
-            <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <div className="w-full max-w-[98%] 2xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
                 <div className="flex items-center gap-6">
                     {showBackButton && (
                         <>

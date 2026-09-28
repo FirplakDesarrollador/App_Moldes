@@ -245,12 +245,12 @@ export default function IndicatorsPage() {
                                 <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest leading-tight">Comprometidos para la fecha</p>
                                 <p className="text-[8px] text-slate-400">FECHA ESPERADA en el rango</p>
                             </div>
-                            {/* Entregados en el rango (informativo) */}
+                            {/* Entregados a tiempo */}
                             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-2 shadow-sm">
-                                <ArrowRightCircle className="w-5 h-5 text-green-500" />
-                                <p className="text-3xl font-black text-green-600">{kpis.entregadosEnRango}</p>
-                                <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest leading-tight">Entregados en la fecha</p>
-                                <p className="text-[8px] text-slate-400">FECHA ENTREGA en el rango</p>
+                                <CheckCircle2 className="w-5 h-5 text-green-500" />
+                                <p className="text-3xl font-black text-green-600">{kpis.cumplieron}</p>
+                                <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest leading-tight">Entregados a tiempo</p>
+                                <p className="text-[8px] text-slate-400">Cumplieron compromiso</p>
                             </div>
                             {/* Nivel de servicio */}
                             <div className={`border rounded-2xl p-6 space-y-2 shadow-sm ${col.softBg} ${col.border}`}>
@@ -366,7 +366,7 @@ export default function IndicatorsPage() {
                                             Comprometidos: {kpis.comprometidos}
                                         </span>
                                         <span className="px-3 py-1 bg-green-500/10 text-green-600 border border-green-300/50 rounded-full text-[9px] font-black uppercase">
-                                            Entregados: {kpis.entregadosEnRango}
+                                            A tiempo: {kpis.cumplieron}
                                         </span>
                                     </div>
                                 </div>

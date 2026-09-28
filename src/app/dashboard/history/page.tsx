@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Package, ClipboardList, Activity, Search, Clock, Loader2, Filter, Calendar, User, Trash2, Edit2, X, Save, AlertTriangle } from 'lucide-react'
+import { Package, ClipboardList, Activity, Search, Clock, Loader2, Filter, Calendar, User, Trash2, Edit2, X, Save, AlertTriangle, AlertCircle, CheckCircle2, RotateCcw } from 'lucide-react'
 import { moldsService } from '@/services/molds.service'
 import Navbar from '@/components/layout/Navbar'
 import holidaysData from '@/data/colombia_festivos_2026.json'
@@ -21,10 +21,17 @@ export default function RegistroMoldesPage() {
     const [searchTerm, setSearchTerm] = useState('')
     const [filterRepairType, setFilterRepairType] = useState('En Reparacion') // Default starting filter
     const [filterView, setFilterView] = useState('Todos') // 'Todos', 'Reparacion Rapida', 'Reparacion Especial'
+    const [categoryFilter, setCategoryFilter] = useState('')
+    const [statusFilter, setStatusFilter] = useState('')
+    const [expectedDateFilter, setExpectedDateFilter] = useState('')
+    const [deliveryDateFilter, setDeliveryDateFilter] = useState('')
+    const [responsibleFilter, setResponsibleFilter] = useState('')
+    const [defectFilter, setDefectFilter] = useState('')
 
     // Catalogs State
     const [defectsCatalog, setDefectsCatalog] = useState<any[]>([])
     const [personnelCatalog, setPersonnelCatalog] = useState<any[]>([])
+    const [responsiblesList, setResponsiblesList] = useState<string[]>([])
     
     const [offset, setOffset] = useState(0)
     const [hasMore, setHasMore] = useState(true)
@@ -92,12 +99,16 @@ export default function RegistroMoldesPage() {
 
         const loadCatalogs = async () => {
             try {
-                const [defects, personnel] = await Promise.all([
+                const [defects, personnel, responsibles] = await Promise.all([
                     moldsService.getDefectsCatalog(),
-                    moldsService.getPersonnel()
+                    moldsService.getPersonnel(),
+                    moldsService.getRegistroResponsables()
                 ])
                 setDefectsCatalog(defects || [])
                 setPersonnelCatalog(personnel || [])
+                if (responsibles && responsibles.length > 0) {
+                    setResponsiblesList(responsibles)
+                }
             } catch (error) {
                 console.error('Error loading catalogs:', error)
             }
@@ -108,11 +119,17 @@ export default function RegistroMoldesPage() {
     const fetchInitial = async (searchVal: string, repairType: string) => {
         setLoading(true)
         setOffset(0)
-        console.log('>>> FETCH INITIAL:', { searchVal, repairType })
+        console.log('>>> FETCH INITIAL:', { searchVal, repairType, categoryFilter, statusFilter, expectedDateFilter, deliveryDateFilter, responsibleFilter, defectFilter })
         try {
             // "Al ingresar... deben mostrarse únicamente los moldes que estén en estado de reparación"
             const data = await moldsService.getAllRegistros(BATCH_SIZE, 0, searchVal, {
-                repair_type: repairType === 'Todos' ? '' : repairType
+                repair_type: repairType === 'Todos' ? '' : repairType,
+                categoria: categoryFilter,
+                estado: statusFilter,
+                fecha_esperada: expectedDateFilter,
+                fecha_entrega: deliveryDateFilter,
+                responsable: responsibleFilter,
+                defecto: defectFilter
             })
 
             setRecords(data || [])
@@ -130,7 +147,13 @@ export default function RegistroMoldesPage() {
         setLoadingMore(true)
         try {
             const data = await moldsService.getAllRegistros(BATCH_SIZE, offset, searchTerm, {
-                repair_type: filterView === 'Todos' ? '' : filterView
+                repair_type: filterView === 'Todos' ? '' : filterView,
+                categoria: categoryFilter,
+                estado: statusFilter,
+                fecha_esperada: expectedDateFilter,
+                fecha_entrega: deliveryDateFilter,
+                responsable: responsibleFilter,
+                defecto: defectFilter
             })
             if (data.length < BATCH_SIZE) setHasMore(false)
             setRecords(prev => [...prev, ...data])
@@ -147,7 +170,68 @@ export default function RegistroMoldesPage() {
 
     useEffect(() => {
         fetchInitial(searchTerm, filterView)
-    }, [searchTerm, filterView])
+    }, [searchTerm, filterView, categoryFilter, statusFilter, expectedDateFilter, deliveryDateFilter, responsibleFilter, defectFilter])
+
+    const hasActiveFilters = Boolean(
+        categoryFilter || statusFilter || expectedDateFilter || deliveryDateFilter || responsibleFilter || defectFilter
+    )
+
+    const resetFilters = () => {
+        setCategoryFilter('')
+        setStatusFilter('')
+        setExpectedDateFilter('')
+        setDeliveryDateFilter('')
+        setResponsibleFilter('')
+        setDefectFilter('')
+    }
+
+    const getCategoryLabel = (r: { tipo?: string | null; tipo_de_reparacion?: string | null; observaciones?: string | null; defectos_a_reparar?: string | null }) => {
+        const tipo = (r.tipo || '').toUpperCase()
+        const tipoRep = (r.tipo_de_reparacion || '').toUpperCase()
+        const obs = (r.observaciones || '').toUpperCase()
+        const def = (r.defectos_a_reparar || '').toUpperCase()
+
+        if (tipo === 'MOLDE NUEVO' || obs.includes('MOLDE NUEVO')) return 'Molde nuevo'
+        if (tipoRep.includes('MODELO') || obs.includes('MODELO NUEVO')) return 'Modelo nuevo'
+        if (tipoRep.includes('RAPIDA') || tipoRep.includes('RÁPIDA')) return 'Reparación rápida'
+        if (tipoRep.includes('ESPECIAL')) return 'Reparación especial'
+        if (tipoRep.includes('DESMANCHADO') || def.includes('DESMANCHADO') || obs.includes('DESMANCHAR')) return 'Desmanchado'
+        if (r.tipo_de_reparacion) return r.tipo_de_reparacion
+        if (r.tipo && r.tipo !== 'Molde') return r.tipo
+        return 'General'
+    }
+
+    const getCategoryStyles = (r: { tipo?: string | null; tipo_de_reparacion?: string | null; observaciones?: string | null; defectos_a_reparar?: string | null }) => {
+        const cat = getCategoryLabel(r)
+        switch (cat) {
+            case 'Reparación rápida':
+                return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+            case 'Reparación especial':
+                return 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
+            case 'Molde nuevo':
+                return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+            case 'Modelo nuevo':
+                return 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20'
+            case 'Desmanchado':
+                return 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20'
+            default:
+                return 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20'
+        }
+    }
+
+    const getStatusStyles = (st: string) => {
+        const s = (st || '').toUpperCase()
+        if (s.includes('REPARACION') || s.includes('PROCESO')) return 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+        if (s.includes('ESPERA')) return 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 border-yellow-500/20'
+        if (s.includes('ENTREGADO') || s.includes('OK') || s.includes('ACTIVO')) return 'bg-green-500/10 text-green-600 border-green-500/20'
+        if (s.includes('DESTRUIDO') || s.includes('BAJA')) return 'bg-red-500/10 text-red-600 border-red-500/20'
+        return 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+    }
+
+    const formatDate = (dateStr?: string | null) => {
+        if (!dateStr) return '—'
+        return dateStr.split('T')[0]
+    }
 
     // Modal search (within Nuevo registro): must use BD_moldes
     const handleMasterSearch = async (val: string) => {
@@ -401,44 +485,44 @@ export default function RegistroMoldesPage() {
                 subtitle="Gestión de Reparaciones y Mantenimiento"
             />
 
-            <main className="pt-32 pb-20 px-6 max-w-7xl mx-auto">
+            <main className="pt-28 pb-20 px-4 sm:px-6 lg:px-8 w-full max-w-[98%] 2xl:max-w-[1920px] mx-auto">
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
                     
                     {/* Header & Main Controls */}
-                    <div className="bg-white dark:bg-slate-900/50 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl p-8 lg:p-12 relative overflow-hidden">
-                        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8">
-                            <div className="space-y-2">
-                                <h1 className="text-4xl font-black tracking-tighter uppercase text-slate-900 dark:text-white">Registro <span className="text-blue-500">moldes</span></h1>
-                                <p className="text-slate-500 font-medium">Panel consolidado de reparaciones en curso.</p>
+                    <div className="bg-white dark:bg-slate-900/50 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl p-6 lg:p-10 relative overflow-hidden">
+                        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+                            <div className="space-y-1">
+                                <h1 className="text-3xl lg:text-4xl font-black tracking-tighter uppercase text-slate-900 dark:text-white">Registro <span className="text-blue-500">moldes</span></h1>
+                                <p className="text-slate-500 font-medium text-xs lg:text-sm">Panel consolidado de reparaciones en curso.</p>
                             </div>
                             
-                            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full lg:w-auto mt-6 lg:mt-0">
+                            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full lg:w-auto">
                                 {/* Type Selector */}
                                 <div className="flex flex-wrap bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700">
                                     {['Todos', 'Reparación rápida', 'Reparación especial'].map((v) => (
                                         <button
                                             key={v}
                                             onClick={() => setFilterView(v)}
-                                            className={`flex-1 min-w-[30%] px-2 py-3 md:px-6 md:py-2 rounded-xl text-[9px] md:text-[10px] font-black uppercase transition-all text-center ${filterView === v ? 'bg-white dark:bg-slate-700 text-blue-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                            className={`flex-1 min-w-[30%] px-3 py-2.5 md:px-5 md:py-2 rounded-xl text-[9px] md:text-[10px] font-black uppercase transition-all text-center ${filterView === v ? 'bg-white dark:bg-slate-700 text-blue-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                         >
                                             {v}
                                         </button>
                                     ))}
                                 </div>
 
-                                <button onClick={handleCreateClick} className="w-full md:w-auto px-8 py-4 md:py-3.5 bg-blue-500 text-white rounded-2xl font-black text-[11px] md:text-[10px] uppercase tracking-widest shadow-xl shadow-blue-500/20 flex items-center justify-center gap-3 active:scale-95 transition-all">
-                                    <Package className="w-5 h-5 md:w-4 md:h-4" /> Nuevo Registro
+                                <button onClick={handleCreateClick} className="w-full md:w-auto px-6 py-3.5 bg-blue-500 text-white rounded-2xl font-black text-[11px] md:text-[10px] uppercase tracking-widest shadow-xl shadow-blue-500/20 flex items-center justify-center gap-2 active:scale-95 transition-all">
+                                    <Package className="w-4 h-4" /> Nuevo Registro
                                 </button>
                             </div>
                         </div>
 
                         {/* Search Bar - Upgraded to Autocomplete pointing to 'moldes' table per Requirement 2.2 */}
-                        <div className="mt-8 md:mt-10 relative group">
+                        <div className="mt-6 relative group">
                             <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                             <input
                                 type="text"
                                 placeholder="Escribe para buscar el molde en Maestro 'moldes'..."
-                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[2rem] py-5 pl-16 pr-8 text-sm font-medium outline-none"
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 pl-16 pr-8 text-sm font-medium outline-none"
                                 value={searchTerm}
                                 onChange={(e) => handleGlobalSearchChange(e.target.value)}
                                 onFocus={() => { if(searchTerm.length >= 2) setShowGlobalResults(true) }}
@@ -459,64 +543,203 @@ export default function RegistroMoldesPage() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Complementary Filters */}
+                        <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800/80 space-y-3.5">
+                            {/* Row 1: Categoría, Estado, Responsable */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                                {/* Categoría */}
+                                <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 relative group">
+                                    <Filter className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 pointer-events-none" />
+                                    <select
+                                        className="w-full bg-transparent border-0 py-2 pl-9 pr-3 text-xs font-bold text-slate-900 dark:text-white outline-none cursor-pointer"
+                                        value={categoryFilter}
+                                        onChange={(e) => setCategoryFilter(e.target.value)}
+                                    >
+                                        <option value="" className="dark:bg-slate-900">Todas las categorías</option>
+                                        <option value="Reparación rápida" className="dark:bg-slate-900">Reparación rápida</option>
+                                        <option value="Reparación especial" className="dark:bg-slate-900">Reparación especial</option>
+                                        <option value="Desmanchado" className="dark:bg-slate-900">Desmanchado</option>
+                                        <option value="Molde nuevo" className="dark:bg-slate-900">Molde nuevo</option>
+                                        <option value="Modelo nuevo" className="dark:bg-slate-900">Modelo nuevo</option>
+                                    </select>
+                                    <label className="absolute -top-2 left-5 px-2 bg-white dark:bg-[#0f172a] text-[9px] font-black text-blue-500 uppercase tracking-widest">Categoría</label>
+                                </div>
+
+                                {/* Estado */}
+                                <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 relative group">
+                                    <Activity className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 pointer-events-none" />
+                                    <select
+                                        className="w-full bg-transparent border-0 py-2 pl-9 pr-3 text-xs font-bold text-slate-900 dark:text-white outline-none cursor-pointer"
+                                        value={statusFilter}
+                                        onChange={(e) => setStatusFilter(e.target.value)}
+                                    >
+                                        <option value="" className="dark:bg-slate-900">Todos los estados</option>
+                                        <option value="En reparacion" className="dark:bg-slate-900">En reparación</option>
+                                        <option value="En espera - Moldes" className="dark:bg-slate-900">En espera - Moldes</option>
+                                        <option value="En espera - Produccion" className="dark:bg-slate-900">En espera - Producción</option>
+                                        <option value="Entregado" className="dark:bg-slate-900">Entregado</option>
+                                        <option value="Destruido" className="dark:bg-slate-900">Destruido</option>
+                                    </select>
+                                    <label className="absolute -top-2 left-5 px-2 bg-white dark:bg-[#0f172a] text-[9px] font-black text-blue-500 uppercase tracking-widest">Estado</label>
+                                </div>
+
+                                {/* Responsable */}
+                                <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 relative group">
+                                    <User className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 pointer-events-none" />
+                                    <select
+                                        className="w-full bg-transparent border-0 py-2 pl-9 pr-3 text-xs font-bold text-slate-900 dark:text-white outline-none cursor-pointer"
+                                        value={responsibleFilter}
+                                        onChange={(e) => setResponsibleFilter(e.target.value)}
+                                    >
+                                        <option value="" className="dark:bg-slate-900">Todos los responsables</option>
+                                        {Array.from(new Set([
+                                            ...responsiblesList,
+                                            ...personnelCatalog.map(p => p.NombreCompleto || p.Nombre).filter(Boolean)
+                                        ])).sort((a: string, b: string) => a.localeCompare(b)).map((resp) => (
+                                            <option key={resp} value={resp} className="dark:bg-slate-900">
+                                                {resp}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <label className="absolute -top-2 left-5 px-2 bg-white dark:bg-[#0f172a] text-[9px] font-black text-blue-500 uppercase tracking-widest">Responsable</label>
+                                </div>
+                            </div>
+
+                            {/* Row 2: Defecto, F. Esperada, F. Real Entrega, Contador y Limpiar */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                                {/* Defecto */}
+                                <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 relative group">
+                                    <AlertCircle className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500" />
+                                    <input
+                                        type="text"
+                                        placeholder="Defecto..."
+                                        className="w-full bg-transparent border-0 py-2 pl-8 pr-2 text-xs font-bold text-slate-900 dark:text-white outline-none"
+                                        value={defectFilter}
+                                        onChange={(e) => setDefectFilter(e.target.value)}
+                                    />
+                                    <label className="absolute -top-2 left-4 px-2 bg-white dark:bg-[#0f172a] text-[9px] font-black text-blue-500 uppercase tracking-widest">Defecto</label>
+                                </div>
+
+                                {/* F. Esperada */}
+                                <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 relative group">
+                                    <Calendar className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 pointer-events-none" />
+                                    <input
+                                        type="date"
+                                        className="w-full bg-transparent border-0 py-2 pl-9 pr-3 text-xs font-bold text-slate-900 dark:text-white outline-none cursor-pointer"
+                                        value={expectedDateFilter}
+                                        onChange={(e) => setExpectedDateFilter(e.target.value)}
+                                    />
+                                    <label className="absolute -top-2 left-5 px-2 bg-white dark:bg-[#0f172a] text-[9px] font-black text-blue-500 uppercase tracking-widest">F. Esperada</label>
+                                </div>
+
+                                {/* F. Real Entrega */}
+                                <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 relative group">
+                                    <CheckCircle2 className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-green-500 pointer-events-none" />
+                                    <input
+                                        type="date"
+                                        className="w-full bg-transparent border-0 py-2 pl-9 pr-3 text-xs font-bold text-slate-900 dark:text-white outline-none cursor-pointer"
+                                        value={deliveryDateFilter}
+                                        onChange={(e) => setDeliveryDateFilter(e.target.value)}
+                                    />
+                                    <label className="absolute -top-2 left-5 px-2 bg-white dark:bg-[#0f172a] text-[9px] font-black text-green-500 uppercase tracking-widest">F. Real Entrega</label>
+                                </div>
+
+                                {/* Estado de Filtros & Limpiar */}
+                                <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+                                    <div className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                                        {loading ? (
+                                            <span className="inline-flex items-center gap-2">
+                                                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
+                                                Cargando...
+                                            </span>
+                                        ) : (
+                                            <span>{records.length} registros</span>
+                                        )}
+                                    </div>
+                                    {hasActiveFilters && (
+                                        <button
+                                            onClick={resetFilters}
+                                            className="px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all active:scale-95 shadow-sm"
+                                            title="Limpiar filtros"
+                                        >
+                                            <RotateCcw className="w-3.5 h-3.5" />
+                                            Limpiar
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Records Table */}
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-sm overflow-hidden min-h-[500px]">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] shadow-sm overflow-hidden min-h-[500px]">
                         <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse min-w-[1100px]">
+                            <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50/50 dark:bg-slate-950/20 border-b border-slate-100 dark:border-slate-800">
-                                        <th className="py-6 px-10 text-[10px] font-black text-slate-400 uppercase tracking-widest">Código / Título</th>
-                                        <th className="py-6 px-10 text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado</th>
-                                        <th className="py-6 px-10 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Tipo Reparación</th>
-                                        <th className="py-6 px-10 text-[10px] font-black text-slate-400 uppercase tracking-widest">Defectos & Notas</th>
-                                        <th className="py-6 px-10 text-[10px] font-black text-slate-400 uppercase tracking-widest">Cronología</th>
-                                        <th className="py-6 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest sticky right-0 bg-slate-50/90 dark:bg-slate-950/90 backdrop-blur z-10 text-center border-l border-slate-100 dark:border-slate-800 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] shadow-slate-200/50 dark:shadow-slate-900/50">Acciones</th>
+                                        <th className="py-4 px-4 text-[10px] font-black uppercase text-slate-400 tracking-wider min-w-[200px]">Título</th>
+                                        <th className="py-4 px-4 text-[10px] font-black uppercase text-slate-400 tracking-wider whitespace-nowrap">Código</th>
+                                        <th className="py-4 px-4 text-[10px] font-black uppercase text-slate-400 tracking-wider whitespace-nowrap">Categoría</th>
+                                        <th className="py-4 px-4 text-[10px] font-black uppercase text-slate-400 tracking-wider whitespace-nowrap">Estado</th>
+                                        <th className="py-4 px-4 text-[10px] font-black uppercase text-slate-400 tracking-wider whitespace-nowrap">F. Entrada</th>
+                                        <th className="py-4 px-4 text-[10px] font-black uppercase text-slate-400 tracking-wider whitespace-nowrap">F. Esperada</th>
+                                        <th className="py-4 px-4 text-[10px] font-black uppercase text-slate-400 tracking-wider whitespace-nowrap">F. Real Entrega</th>
+                                        <th className="py-4 px-4 text-[10px] font-black uppercase text-slate-400 tracking-wider min-w-[200px]">Defectos & Notas</th>
+                                        <th className="py-4 px-4 text-[10px] font-black uppercase text-slate-400 tracking-wider whitespace-nowrap">Responsable</th>
+                                        <th className="py-4 px-4 text-[10px] font-black uppercase text-slate-400 tracking-wider sticky right-0 bg-slate-50/90 dark:bg-slate-950/90 backdrop-blur z-10 text-center border-l border-slate-100 dark:border-slate-800 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)]">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 relative">
                                     {records.map((r, i) => (
                                         <tr key={`${r.id}-${i}`} ref={i === records.length - 1 ? lastElementRef : null} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-all group">
-                                            <td className="py-8 px-10">
-                                                <div className="space-y-1">
-                                                    <div className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">{r.codigo_molde || 'S/C'}</div>
-                                                    <div className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[250px]">{r.titulo || 'Sin Título'}</div>
+                                            <td className="py-4 px-4 align-middle font-bold text-slate-900 dark:text-white uppercase leading-snug text-xs min-w-[200px]">
+                                                {r.titulo || 'Sin Título'}
+                                            </td>
+                                            <td className="py-4 px-4 align-middle whitespace-nowrap">
+                                                <span className="font-mono text-xs font-bold text-slate-500 uppercase">{r.codigo_molde || 'S/C'}</span>
+                                            </td>
+                                            <td className="py-4 px-4 align-middle whitespace-nowrap">
+                                                <div className={`inline-flex px-3 py-1.5 rounded-full text-[9px] font-black uppercase border tracking-wider ${getCategoryStyles(r)}`}>
+                                                    {getCategoryLabel(r)}
                                                 </div>
                                             </td>
-                                            <td className="py-8 px-10">
-                                                <span className={`px-4 py-2 rounded-xl text-[9px] font-black border uppercase tracking-widest ${
-                                                    (r.estado || '').includes('reparacion') || (r.estado || '') === 'En reparación' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 
-                                                    (r.estado || '').includes('Entregado') || (r.estado || '') === 'Activo' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
-                                                    (r.estado || '').includes('Destruido') || (r.estado || '') === 'Baja' ? 'bg-red-500/10 text-red-600 border-red-500/20' :
-                                                    'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
-                                                }`}>
+                                            <td className="py-4 px-4 align-middle whitespace-nowrap">
+                                                <span className={`px-3 py-1.5 rounded-full text-[9px] font-black border uppercase tracking-wider ${getStatusStyles(r.estado)}`}>
                                                     {r.estado || 'Sin Estado'}
                                                 </span>
                                             </td>
-                                            <td className="py-8 px-10 text-center">
-                                                <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-full text-[9px] font-black uppercase text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                                                    {r.tipo_de_reparacion || 'N/A'}
+                                            <td className="py-4 px-4 align-middle whitespace-nowrap font-mono text-xs font-bold text-slate-600 dark:text-gray-400">
+                                                {formatDate(r.fecha_entrada)}
+                                            </td>
+                                            <td className="py-4 px-4 align-middle whitespace-nowrap">
+                                                <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-slate-700 dark:text-gray-300">
+                                                    <Calendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                                    {formatDate(r.fecha_esperada)}
                                                 </div>
                                             </td>
-                                            <td className="py-8 px-10 max-w-[350px]">
-                                                <div className="space-y-1.5">
-                                                    <p className="text-xs font-bold text-red-500 leading-relaxed truncate">{r.defectos_a_reparar || '--'}</p>
-                                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 italic truncate opacity-70">{r.observaciones}</p>
-                                                </div>
-                                            </td>
-                                            <td className="py-8 px-10">
-                                                <div className="flex flex-col gap-1 min-w-[100px]">
-                                                    <div className="flex items-center gap-2 text-[10px] font-black text-slate-600 dark:text-slate-300">
-                                                        <Calendar className="w-3 h-3 text-blue-500" />
-                                                        {r.fecha_entrada ? r.fecha_entrada : 'S/F'}
+                                            <td className="py-4 px-4 align-middle whitespace-nowrap">
+                                                {r.fecha_entrega ? (
+                                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-500/10 text-green-600 dark:text-green-400 font-mono text-xs font-bold border border-green-500/20">
+                                                        <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                                                        {formatDate(r.fecha_entrega)}
                                                     </div>
-                                                    <div className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Vence: {r.fecha_esperada || '---'}</div>
+                                                ) : (
+                                                    <span className="text-[10px] text-gray-400 dark:text-gray-500 italic font-medium">Pendiente</span>
+                                                )}
+                                            </td>
+                                            <td className="py-4 px-4 align-middle min-w-[200px]">
+                                                <div className="space-y-1">
+                                                    <p className="text-xs font-bold text-red-500 leading-relaxed truncate">{r.defectos_a_reparar || '--'}</p>
+                                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 italic truncate opacity-70">{r.observaciones || '--'}</p>
                                                 </div>
                                             </td>
-                                            <td className="py-8 px-6 sticky right-0 bg-white dark:bg-slate-900 group-hover:bg-slate-50/50 dark:group-hover:bg-slate-800/80 transition-all border-l border-slate-100 dark:border-slate-800 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] shadow-slate-200/50 dark:shadow-slate-900/50 z-10 text-center align-middle">
-                                                <button onClick={() => handleEditClick(r)} className="p-3.5 bg-slate-100 dark:bg-slate-800 rounded-2xl hover:bg-blue-500 hover:text-white transition-all border border-slate-200 dark:border-slate-700 mx-auto flex shrink-0 group/btn">
-                                                    <Edit2 className="w-4 h-4 text-slate-500 group-hover/btn:text-white dark:text-slate-400" />
+                                            <td className="py-4 px-4 align-middle whitespace-nowrap text-[10px] font-black text-slate-600 dark:text-gray-400">
+                                                {r.responsable || 'N/A'}
+                                            </td>
+                                            <td className="py-4 px-4 sticky right-0 bg-white dark:bg-slate-900 group-hover:bg-slate-50/50 dark:group-hover:bg-slate-800/80 transition-all border-l border-slate-100 dark:border-slate-800 text-center align-middle">
+                                                <button onClick={() => handleEditClick(r)} className="p-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-blue-500 hover:text-white transition-all border border-slate-200 dark:border-slate-700 mx-auto flex shrink-0 group/btn">
+                                                    <Edit2 className="w-3.5 h-3.5 text-slate-500 group-hover/btn:text-white dark:text-slate-400" />
                                                 </button>
                                             </td>
                                         </tr>

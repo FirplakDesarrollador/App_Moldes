@@ -28,12 +28,12 @@ export default function MoldsPage() {
             />
 
             {/* Content Container */}
-            <div className="max-w-7xl mx-auto px-6 py-12">
+            <div className="w-full max-w-[98%] 2xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <MoldsModule />
             </div>
 
             {/* Footer Placeholders for other modules */}
-            <div className="max-w-7xl mx-auto px-6 pb-12">
+            <div className="w-full max-w-[98%] 2xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 pb-12">
                 <div className="border-t border-black/5 dark:border-white/5 pt-12">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 opacity-40 grayscale">
                         <div className="p-6 glass-card rounded-[2rem]">
