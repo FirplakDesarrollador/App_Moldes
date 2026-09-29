@@ -64,7 +64,7 @@ export default function Error({ error, reset }: ErrorProps) {
 
                 <p className="text-[10px] text-muted-foreground text-center">
                     Si el problema persiste después de recargar, por favor contacte a soporte técnico.
-                    PV_MOLDES V2.4
+                    PV_MOLDES V3.1
                 </p>
             </div>
         </div>
