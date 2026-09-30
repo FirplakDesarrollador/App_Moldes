@@ -142,7 +142,7 @@ export default function MoldDetails({ mold, onClose, onEdit }: MoldDetailsProps)
                                 <div>
                                     <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-3 block">Defectos Asociados:</label>
                                     <div className="flex flex-wrap gap-2">
-                                        {mold["DEFECTOS A REPARAR"]?.split(',').map((d, i) => (
+                                        {mold["DEFECTOS A REPARAR"]?.split(',').map((d: string, i: number) => (
                                             <span key={i} className="px-4 py-2 bg-red-500/5 text-red-500/80 border border-red-500/10 rounded-xl text-[10px] font-black uppercase">
                                                 {d.trim()}
                                             </span>

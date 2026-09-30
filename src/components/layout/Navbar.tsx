@@ -31,7 +31,7 @@ export default function Navbar({
 
     return (
         <nav className="glass-card sticky top-0 z-50 border-x-0 border-t-0 rounded-none bg-opacity-70 dark:bg-opacity-40">
-            <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <div className="w-full max-w-[98%] 2xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
                 <div className="flex items-center gap-6">
                     {showBackButton && (
                         <>
@@ -58,7 +58,7 @@ export default function Navbar({
                         <div className="flex flex-col">
                             <div className="flex items-center gap-2">
                                 <span className="text-xl font-black tracking-tighter leading-none text-[var(--foreground)]">{title}</span>
-                                <span className="text-[9px] bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 px-1.2 py-0.2 rounded border border-blue-200 dark:border-blue-500/10 font-bold">V3.0</span>
+                                <span className="text-[9px] bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 px-1.2 py-0.2 rounded border border-blue-200 dark:border-blue-500/10 font-bold">V3.1</span>
                             </div>
                             <span className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">{subtitle}</span>
                         </div>

@@ -468,7 +468,6 @@ export default function IndicatorsPage() {
                                         </div>
                                     ))}
                                 </div>
-
                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                                     <RapidaCard label="Total Moldes Reparados" value={Math.round(rapidaResult.totalMoldesReparados).toString()} sub="Ponderado (Clic ver)" icon={<Package />} colorClass="text-amber-600" bgClass="bg-amber-50 dark:bg-amber-900/20 border-amber-200" onClick={() => { setRapidaModalType('reparados'); setShowRapidaModal(true); }} />
                                     <RapidaCard label="Moldes Esperados" value={String(rapidaResult.moldesEsperados)} sub="F. ESPERADA en rango (Ver)" icon={<CalendarDays />} colorClass="text-blue-600" bgClass="bg-blue-50 border-blue-200" onClick={() => { setRapidaModalType('esperados'); setShowRapidaModal(true); }} />
@@ -509,7 +508,7 @@ export default function IndicatorsPage() {
                             <div className="space-y-8">
                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                                     <div className="bg-white dark:bg-slate-900 border border-slate-200 p-6 rounded-2xl shadow-sm space-y-2"><CalendarDays className="text-blue-500" /><p className="text-3xl font-black text-blue-600">{kpis.comprometidos}</p><p className="text-[9px] font-black uppercase text-slate-600">Comprometidos</p></div>
-                                    <div className="bg-white dark:bg-slate-900 border border-slate-200 p-6 rounded-2xl shadow-sm space-y-2"><ArrowRightCircle className="text-green-500" /><p className="text-3xl font-black text-green-600">{kpis.entregadosEnRango}</p><p className="text-[9px] font-black uppercase text-slate-600">Entregados</p></div>
+                                    <div className="bg-white dark:bg-slate-900 border border-slate-200 p-6 rounded-2xl shadow-sm space-y-2"><CheckCircle2 className="text-green-500" /><p className="text-3xl font-black text-green-600">{kpis.cumplieron}</p><p className="text-[9px] font-black uppercase text-slate-600">Entregados a tiempo</p></div>
                                     <div className={`border p-6 rounded-2xl shadow-sm space-y-2 ${col.softBg} ${col.border}`}><TrendingUp className={gc.text} /><p className={`text-3xl font-black ${gc.text}`}>{Math.round(kpis.nivel)}%</p><p className="text-[9px] font-black uppercase text-slate-600">Nivel de servicio</p></div>
                                     <div className="bg-white dark:bg-slate-900 border border-slate-200 p-6 rounded-2xl shadow-sm space-y-2"><Zap className="text-emerald-500" /><p className="text-3xl font-black text-emerald-600">{kpis.hasOps ? kpis.productividad.toFixed(1) : '—'}</p><p className="text-[9px] font-black uppercase text-slate-600">Productividad</p></div>
                                     <div className={`border p-6 rounded-2xl shadow-sm space-y-2 ${col.softBg} ${col.border}`}><activeCat.icon className={col.text} /><p className="text-sm font-black uppercase text-slate-700">{activeCat.label}</p><p className="text-[9px] font-black uppercase text-slate-500">Categoría activa</p></div>
@@ -541,15 +540,23 @@ export default function IndicatorsPage() {
                                                 <span className={`px-3 py-1 text-[9px] font-black uppercase rounded-full border ${col.border} ${col.text} ${col.softBg}`}>{activeCat.label}</span>
                                             </h3>
                                             
-                                            {selectedCat === 'REPARACION_ESPECIAL' && (
-                                                <button 
-                                                    onClick={() => setShowDelayedModal(true)}
-                                                    className="flex items-center gap-2 px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white text-[10px] font-black uppercase rounded-xl transition-all shadow-lg shadow-red-500/20 active:scale-95"
-                                                >
-                                                    <AlertTriangle className="w-4 h-4" />
-                                                    Ver Moldes Atrasados
-                                                </button>
-                                            )}
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="px-3 py-1 bg-blue-500/10 text-blue-600 border border-blue-300/50 rounded-full text-[9px] font-black uppercase">
+                                                    Comprometidos: {kpis.comprometidos}
+                                                </span>
+                                                <span className="px-3 py-1 bg-green-500/10 text-green-600 border border-green-300/50 rounded-full text-[9px] font-black uppercase">
+                                                    A tiempo: {kpis.cumplieron}
+                                                </span>
+                                                {selectedCat === 'REPARACION_ESPECIAL' && (
+                                                    <button 
+                                                        onClick={() => setShowDelayedModal(true)}
+                                                        className="flex items-center gap-2 px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white text-[10px] font-black uppercase rounded-xl transition-all shadow-lg shadow-red-500/20 active:scale-95"
+                                                    >
+                                                        <AlertTriangle className="w-4 h-4" />
+                                                        Ver Moldes Atrasados
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-left min-w-[800px]">

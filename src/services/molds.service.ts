@@ -21,16 +21,18 @@ export interface Mold {
     modified_at?: string
     Nombre?: string
     repair_event_id?: string
+    [key: string]: any
 }
 
 export interface MoldActive {
-    id: number
+    [key: string]: any
+    id?: any
     ID?: number
-    Título: string
+    Título?: string
     Nombre?: string
-    "CODIGO MOLDE": string
+    "CODIGO MOLDE"?: string
     Prioridad?: string
-    ESTADO: string
+    ESTADO?: string
     "FECHA ENTRADA"?: string
     "FECHA ESPERADA"?: string
     "FECHA ENTREGA"?: string
@@ -41,6 +43,7 @@ export interface MoldActive {
     Created?: string
     Modified?: string
     repair_event_id?: string
+    serial?: string
 }
 
 function normalizeRepairType(val: any): string {
@@ -378,7 +381,7 @@ export const moldsService = {
             id: d.id,
             titulo: d.Título || d.titulo || d.Nombre || 'Sin Título',
             tiempo: parseFloat(d.Tiempo || d.tiempo || 0)
-        })).sort((a, b) => a.titulo.localeCompare(b.titulo))
+        })).sort((a: any, b: any) => a.titulo.localeCompare(b.titulo))
     },
 
     // Get personnel
@@ -409,12 +412,91 @@ export const moldsService = {
             query = query.or(`codigo_molde.ilike.${term},titulo.ilike.${term},defectos_a_reparar.ilike.${term},estado.ilike.${term}`)
         }
 
+        if (filters?.defecto && filters.defecto.trim()) {
+            query = query.ilike('defectos_a_reparar', `%${filters.defecto.trim()}%`)
+        }
+
+        if (filters?.categoria && filters.categoria.trim()) {
+            const cat = filters.categoria.trim().toLowerCase()
+            if (cat.includes('rapida') || cat.includes('rápida')) {
+                query = query.or('tipo_de_reparacion.ilike.%rapida%,tipo_de_reparacion.ilike.%rápida%,observaciones.ilike.%rapida%')
+            } else if (cat.includes('especial')) {
+                query = query.or('tipo_de_reparacion.ilike.%especial%,observaciones.ilike.%especial%')
+            } else if (cat.includes('molde nuevo')) {
+                query = query.or('tipo.ilike.%molde nuevo%,observaciones.ilike.%molde nuevo%')
+            } else if (cat.includes('modelo nuevo')) {
+                query = query.or('tipo_de_reparacion.ilike.%modelo%,observaciones.ilike.%modelo%')
+            } else if (cat.includes('desmanchado')) {
+                query = query.or('tipo_de_reparacion.ilike.%desmanchado%,defectos_a_reparar.ilike.%desmanchado%,observaciones.ilike.%desmanchar%')
+            } else {
+                query = query.or(`tipo_de_reparacion.ilike.%${cat}%,tipo.ilike.%${cat}%`)
+            }
+        } else if (filters?.tipo_reparacion && filters.tipo_reparacion.trim()) {
+            const tr = filters.tipo_reparacion.trim()
+            query = query.or(`tipo_de_reparacion.ilike.%${tr}%,tipo.ilike.%${tr}%`)
+        }
+
+        if (filters?.estado && filters.estado !== 'Todos' && filters.estado.trim()) {
+            query = query.ilike('estado', `%${filters.estado.trim()}%`)
+        }
+
+        if (filters?.fecha_esperada && filters.fecha_esperada.trim()) {
+            query = query.eq('fecha_esperada', filters.fecha_esperada.trim())
+        }
+
+        if (filters?.fecha_entrega && filters.fecha_entrega.trim()) {
+            query = query.eq('fecha_entrega', filters.fecha_entrega.trim())
+        }
+
+        if (filters?.responsable && filters.responsable !== 'Todos' && filters.responsable.trim()) {
+            query = query.ilike('responsable', `%${filters.responsable.trim()}%`)
+        }
+
         const { data, error } = await query.range(offset, offset + limit - 1)
         if (error) {
             console.error('Error fetching base_datos_historico_moldes:', error)
             return []
         }
         return data || []
+    },
+
+    async getHistoricoResponsables(): Promise<string[]> {
+        const supabase = createClient()
+        const { data, error } = await supabase
+            .from('base_datos_historico_moldes')
+            .select('responsable')
+            .not('responsable', 'is', null)
+            .limit(3000)
+
+        if (error || !data) return []
+        const uniqueSet = new Set<string>()
+        data.forEach((d: any) => {
+            if (d.responsable && typeof d.responsable === 'string') {
+                const clean = d.responsable.trim()
+                if (clean) uniqueSet.add(clean)
+            }
+        })
+        return Array.from(uniqueSet).sort((a, b) => a.localeCompare(b))
+    },
+
+    async getRegistroResponsables(): Promise<string[]> {
+        const supabase = createClient()
+        const { data, error } = await supabase
+            .from('BD_moldes')
+            .select('Responsable')
+            .not('Responsable', 'is', null)
+            .limit(3000)
+
+        if (error || !data) return []
+        const uniqueSet = new Set<string>()
+        data.forEach((d: any) => {
+            const resp = d.Responsable || d.responsable
+            if (resp && typeof resp === 'string') {
+                const clean = resp.trim()
+                if (clean) uniqueSet.add(clean)
+            }
+        })
+        return Array.from(uniqueSet).sort((a, b) => a.localeCompare(b))
     },
 
     // Module: REGISTRO MOLDES (public."BD_moldes")
@@ -449,18 +531,55 @@ export const moldsService = {
             query = query.or(`"CODIGO MOLDE".ilike.${term},"Título".ilike.${term},"DEFECTOS A REPARAR".ilike.${term}`)
         }
 
-        // Filtrar SOLO estados activos (inclusión explícita, más precisa que exclusión)
-        query = query.in('ESTADO', ACTIVE_STATES)
+        if (filters?.estado && filters.estado !== 'Todos' && filters.estado.trim()) {
+            query = query.ilike('ESTADO', `%${filters.estado.trim()}%`)
+        } else {
+            // Filtrar SOLO estados activos (inclusión explícita)
+            query = query.in('ESTADO', ACTIVE_STATES)
+        }
 
         if (filters?.repair_type && filters.repair_type !== 'Todos') {
             const rt = filters.repair_type.toLowerCase();
-            if (rt.includes('rapida') || rt.includes('rápida')) {
+            if (rt === 'reparaciones') {
+                query = query.or(`"ESTADO".ilike.%reparacion%,"Tipo de reparacion".ilike.%reparacion%,"Tipo de reparacion".ilike.%rapida%,"Tipo de reparacion".ilike.%especial%`)
+            } else if (rt.includes('rapida') || rt.includes('rápida')) {
                 query = query.or('"Tipo de reparacion".ilike.%rapida%,"Tipo de reparacion".ilike.%rápida%')
             } else if (rt.includes('especial')) {
                 query = query.or('"Tipo de reparacion".ilike.%especial%,"Tipo de reparacion".ilike.%Especial%')
             } else {
-                query = query.ilike('Tipo de reparacion', `%${filters.repair_type}%`)
+                query = query.ilike('"Tipo de reparacion"', `%${filters.repair_type}%`)
             }
+        }
+
+        if (filters?.categoria && filters.categoria !== 'Todas las categorías' && filters.categoria.trim()) {
+            const cat = filters.categoria.toLowerCase();
+            if (cat.includes('rapida') || cat.includes('rápida')) {
+                query = query.ilike('"Tipo de reparacion"', '%rapida%')
+            } else if (cat.includes('especial')) {
+                query = query.ilike('"Tipo de reparacion"', '%especial%')
+            } else if (cat.includes('desmanchado')) {
+                query = query.or(`"Tipo de reparacion".ilike.%desmanchado%,"DEFECTOS A REPARAR".ilike.%desmanchado%,"OBSERVACIONES".ilike.%desmanchar%`)
+            } else if (cat.includes('molde nuevo')) {
+                query = query.or(`"Tipo".ilike.%molde nuevo%,"OBSERVACIONES".ilike.%molde nuevo%`)
+            } else if (cat.includes('modelo nuevo')) {
+                query = query.or(`"Tipo de reparacion".ilike.%modelo%,"OBSERVACIONES".ilike.%modelo nuevo%`)
+            }
+        }
+
+        if (filters?.fecha_esperada && filters.fecha_esperada.trim()) {
+            query = query.eq('"FECHA ESPERADA"', filters.fecha_esperada.trim())
+        }
+
+        if (filters?.fecha_entrega && filters.fecha_entrega.trim()) {
+            query = query.eq('"FECHA ENTREGA"', filters.fecha_entrega.trim())
+        }
+
+        if (filters?.responsable && filters.responsable !== 'Todos' && filters.responsable.trim()) {
+            query = query.ilike('Responsable', `%${filters.responsable.trim()}%`)
+        }
+
+        if (filters?.defecto && filters.defecto.trim()) {
+            query = query.ilike('"DEFECTOS A REPARAR"', `%${filters.defecto.trim()}%`)
         }
 
         const { data, error } = await query.range(offset, offset + limit - 1)
@@ -772,22 +891,35 @@ export const moldsService = {
         return data || []
     },
 
-    async updateStatus(mold: MoldActive, newStatus: string, user: string) {
+    async updateStatus(mold: any, newStatus: string, user: string) {
         const supabase = createClient()
-        const { error } = await supabase
-            .from('BD_moldes')
-            .update({ 
-                ESTADO: newStatus,
-                Modified: new Date().toISOString(),
-                "Modified By": user
-            })
-            .eq('id', mold.id)
-        
-        if (error) throw error
+        if (mold.id) {
+            const { error: err1 } = await supabase
+                .from('BD_moldes')
+                .update({ 
+                    ESTADO: newStatus,
+                    Modified: new Date().toISOString(),
+                    "Modified By": user
+                })
+                .eq('id', mold.id)
+            if (err1) throw err1
+        }
+        const serial = mold.serial || mold["CODIGO MOLDE"]
+        if (serial) {
+            const { error: err2 } = await supabase
+                .from('moldes')
+                .update({ 
+                    estado: newStatus,
+                    modified_at: new Date().toISOString(),
+                    modificado_por: user
+                })
+                .eq('serial', serial)
+            if (err2) console.warn('Could not sync status in moldes table:', err2.message)
+        }
         return true
     },
 
-    async getCountByReference(name: string) {
+    async getCountByReference(name?: string) {
         if (!name) return 0
         const supabase = createClient()
         const { count, error } = await supabase
@@ -795,8 +927,16 @@ export const moldsService = {
             .select('*', { count: 'exact', head: true })
             .ilike('Título', name)
         
-        if (error) return 0
-        return count || 0
+        if (!error && typeof count === 'number' && count > 0) return count
+
+        const { count: countMoldes, error: err2 } = await supabase
+            .from('moldes')
+            .select('*', { count: 'exact', head: true })
+            .eq('nombre_articulo', name)
+            .ilike('estado', '%reparacion%')
+
+        if (err2) return 0
+        return countMoldes || 0
     },
 
     // Raw Materials Methods
@@ -822,7 +962,7 @@ export const moldsService = {
             mp_molde_codigo: m['MP MOLDE CODIGO'] || '--',
             // Keep actual row for autocompletion
             raw: m
-        })).sort((a, b) => a.titulo.localeCompare(b.titulo))
+        })).sort((a: any, b: any) => a.titulo.localeCompare(b.titulo))
     },
 
     async saveRawMaterialMovement(movement: any) {
