@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
+import { createIndicatorsClient } from '@/lib/indicatorsSupabase'
 import { Search, Lock, Loader2, User, Settings, Check, ChevronDown } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useSAP } from '@/context/SAPContext'
@@ -98,6 +99,12 @@ export default function AuthForm() {
         setMessage('')
 
         if (cedulaInput === selectedEmployee.Cedula?.toString()) {
+            const { error } = await createIndicatorsClient().auth.signOut({ scope: 'local' })
+            if (error) {
+                setMessage('No se pudo cerrar la autorización anterior. Intenta nuevamente.')
+                setLoading(false)
+                return
+            }
             localStorage.setItem('moldapp_user', JSON.stringify(selectedEmployee))
 
             // Initiate SAP Login

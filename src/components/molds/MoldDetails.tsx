@@ -32,7 +32,7 @@ export default function MoldDetails({ mold, onClose, onEdit }: MoldDetailsProps)
         }
     }
 
-    const getStatusStyles = (st: string) => {
+    const getStatusStyles = (st?: string) => {
         const s = (st || '').toUpperCase()
         if (s.includes('REPARACION')) return 'bg-blue-500/10 text-blue-400 border-blue-500/20'
         if (s.includes('ESPERA')) return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'

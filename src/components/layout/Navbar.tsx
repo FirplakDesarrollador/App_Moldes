@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, LogOut, Settings, User, MapPin } from 'lucide-react'
 import SAPSessionBadge from '@/components/auth/SAPSessionBadge'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { createIndicatorsClient } from '@/lib/indicatorsSupabase'
 
 interface NavbarProps {
     user: any
@@ -24,7 +25,12 @@ export default function Navbar({
 }: NavbarProps) {
     const router = useRouter()
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        const { error } = await createIndicatorsClient().auth.signOut({ scope: 'local' })
+        if (error) {
+            window.alert('No se pudo cerrar la sesión. Intenta nuevamente.')
+            return
+        }
         localStorage.removeItem('moldapp_user')
         window.location.href = '/login'
     }

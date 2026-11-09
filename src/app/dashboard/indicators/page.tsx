@@ -12,6 +12,7 @@ import {
     indicatorsService, IndicatorStats, MoldIndicatorRow, RapidaKPIResult, getDatesInRange,
 } from '@/services/indicators.service'
 import Navbar from '@/components/layout/Navbar'
+import DailySpecialIndicators from '@/components/DailySpecialIndicators'
 
 // ── Category config ──────────────────────────────────────────────────────────
 const CATEGORIES = [
@@ -382,6 +383,12 @@ export default function IndicatorsPage() {
                                 Actualizar Reporte
                             </button>
                         </div>
+                    )}
+
+                    {selectedCat === 'REPARACION_ESPECIAL' && user && (
+                        <DailySpecialIndicators key={`${dateRange.start}:${dateRange.end}`}
+                            start={dateRange.start} end={dateRange.end}
+                            userName={user.Nombre || user.NombreCompleto || 'Usuario'} />
                     )}
 
                     <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
