@@ -251,7 +251,7 @@ export default function IndisponibilidadPage() {
                                 <div className="p-3 bg-violet-50 rounded-2xl"><Activity className="w-5 h-5 text-violet-500" /></div>
                                 <p className={`text-5xl font-black ${ic.text}`}>{result.indice.toFixed(1)}%</p>
                                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Índice de Indisponibilidad</p>
-                                <p className="text-[9px] text-slate-400">Promedio días fuera / {result.daysInMonth} días del mes</p>
+                                <p className="text-[9px] text-slate-400">Promedio días fuera / {result.diasPeriodo} días del período</p>
                             </div>
                             <div className="bg-white dark:bg-slate-900 border border-slate-200 p-8 rounded-[2.5rem] shadow-sm flex flex-col items-center gap-3 text-center">
                                 <div className="p-3 bg-slate-50 rounded-2xl"><BarChart3 className="w-5 h-5 text-slate-500" /></div>
@@ -278,7 +278,7 @@ export default function IndisponibilidadPage() {
                                 </p>
                                 <p className="text-[10px] text-slate-600">
                                     En promedio, cada molde estuvo <strong>{result.promedioDiasFuera.toFixed(1)} días</strong> en reparación
-                                    en el período ({result.daysInMonth} días del mes), representando un <strong>{result.indice.toFixed(1)}%</strong> de indisponibilidad.
+                                    en el período ({result.diasPeriodo} días), representando un <strong>{result.indice.toFixed(1)}%</strong> de indisponibilidad.
                                 </p>
                             </div>
                         </div>

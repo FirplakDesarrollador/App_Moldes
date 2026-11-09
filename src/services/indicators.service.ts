@@ -7,6 +7,40 @@ import isSameOrBefore from 'dayjs/plugin/isSameOrBefore'
 dayjs.extend(isBetween)
 dayjs.extend(isSameOrBefore)
 
+/**
+ * Supabase returns at most a fixed number of rows per request (10.000 in this
+ * project), silently truncating larger results. The historical table is far
+ * bigger, so read every matching row in id-ordered pages.
+ */
+const HIST_PAGE_SIZE = 1000
+const HIST_CONCURRENCY = 8
+
+async function fetchAllHistorical(
+    columns: string,
+    applyFilters: (q: any) => any,
+): Promise<any[]> {
+    const supabase = createClient()
+    const { count, error } = await applyFilters(
+        supabase.from('base_datos_historico_moldes').select('id', { count: 'exact', head: true })
+    )
+    if (error) throw error
+    const pages = Math.ceil((count || 0) / HIST_PAGE_SIZE)
+    const rows: any[] = []
+    for (let first = 0; first < pages; first += HIST_CONCURRENCY) {
+        const batch = Array.from({ length: Math.min(HIST_CONCURRENCY, pages - first) }, (_, i) => {
+            const from = (first + i) * HIST_PAGE_SIZE
+            return applyFilters(supabase.from('base_datos_historico_moldes').select(columns))
+                .order('id', { ascending: true })
+                .range(from, from + HIST_PAGE_SIZE - 1)
+        })
+        for (const { data, error: pageError } of await Promise.all(batch)) {
+            if (pageError) throw pageError
+            rows.push(...(data || []))
+        }
+    }
+    return rows
+}
+
 const ACTIVE_STATES = [
     'En reparación',
     'En reparacion',
@@ -189,11 +223,69 @@ export interface IndisponibilidadResult {
     totalMoldes: number
     enReparacionActual: number
     indice: number
-    daysInMonth: number
+    /** Días del período evaluado (inicio → min(fin, hoy)): denominador del índice. */
+    diasPeriodo: number
 }
 
 export interface IndisponibilidadRow extends IndisponibilidadResult {
     referencia: string
+}
+
+const DAY_MS = 86400000
+const toDay = (iso: string) => Math.round(new Date(iso + 'T00:00:00Z').getTime() / DAY_MS)
+
+/** Período evaluado en días absolutos; los días posteriores a hoy aún no pueden contarse. */
+function periodoIndisponibilidad(dateRange: { start: string; end: string }, today: string) {
+    const start = toDay(dateRange.start)
+    const end = Math.min(toDay(dateRange.end), toDay(today))
+    return { start, end, dias: Math.max(0, end - start + 1) }
+}
+
+/**
+ * Días-calendario distintos que un molde estuvo fuera dentro del período.
+ * - Eventos deduplicados por fecha_entrada (gana el registro de mayor id).
+ * - "En reparación"/"En espera": desde entrada hasta entrega, o hasta hoy si no se ha cerrado.
+ * - "Entregado" con fecha de entrega: desde entrada hasta entrega.
+ * Los intervalos se unen, así un mismo día nunca se cuenta dos veces.
+ */
+function diasFueraMolde(events: any[], periodo: { start: number; end: number }, today: string) {
+    const intervals: [number, number][] = []
+    for (const r of events) {
+        if (!r.fecha_entrada) continue
+        const estado = (r.estado || '').toLowerCase()
+        const abierto = estado.includes('reparacion') || estado.includes('reparación') || estado.includes('espera')
+        const entregado = estado.includes('entregado') && !!r.fecha_entrega
+        if (!abierto && !entregado) continue
+        const from = Math.max(toDay(r.fecha_entrada), periodo.start)
+        const to = Math.min(toDay(r.fecha_entrega || today), periodo.end)
+        if (to >= from) intervals.push([from, to])
+    }
+    intervals.sort((a, b) => a[0] - b[0])
+    let dias = 0
+    let current: [number, number] | null = null
+    for (const [s, e] of intervals) {
+        if (!current || s > current[1] + 1) {
+            if (current) dias += current[1] - current[0] + 1
+            current = [s, e]
+        } else if (e > current[1]) current[1] = e
+    }
+    if (current) dias += current[1] - current[0] + 1
+    return dias
+}
+
+/** Deduplica por (codigo_molde | fecha_entrada) conservando el mayor id y agrupa por serial. */
+function eventosPorSerial(histRaw: any[]) {
+    const eventMap: Record<string, any> = {}
+    for (const r of histRaw) {
+        const key = `${(r.codigo_molde || '').trim().toUpperCase()}|${r.fecha_entrada}`
+        if (!eventMap[key] || r.id > eventMap[key].id) eventMap[key] = r
+    }
+    const bySerial: Record<string, any[]> = {}
+    for (const r of Object.values(eventMap)) {
+        const serial = (r.codigo_molde || '').trim().toUpperCase()
+        ;(bySerial[serial] ||= []).push(r)
+    }
+    return bySerial
 }
 
 export const indicatorsService = {
@@ -230,15 +322,16 @@ export const indicatorsService = {
     /**
      * Calcula el índice de indisponibilidad para una referencia de molde.
      *
-     * Promedio días fuera = Σ(días en estado "En reparacion" dentro del rango por cada molde) / cantidad moldes no destruidos
-     * Índice               = promedio días fuera / días del mes del rango × 100
+     * Promedio días fuera = Σ(días-calendario distintos fuera dentro del período por molde) / cantidad moldes no destruidos
+     * Índice               = promedio días fuera / días del período (hasta hoy) × 100  → máximo 100%
      */
     async getIndisponibilidadByRef(
         nombreArticulo: string,
         dateRange: { start: string; end: string }
     ): Promise<IndisponibilidadResult> {
         const supabase = createClient()
-        const today = new Date().toISOString().split('T')[0]
+        const today = dayjs().format('YYYY-MM-DD')
+        const periodo = periodoIndisponibilidad(dateRange, today)
 
         // 1. Moldes de la referencia no destruidos
         const { data: moldMaster } = await supabase
@@ -251,7 +344,7 @@ export const indicatorsService = {
         )
         const totalMoldes = noDestruidos.length
         if (totalMoldes === 0) {
-            return { promedioDiasFuera: 0, totalMoldes: 0, enReparacionActual: 0, indice: 0, daysInMonth: 30 }
+            return { promedioDiasFuera: 0, totalMoldes: 0, enReparacionActual: 0, indice: 0, diasPeriodo: periodo.dias }
         }
         const seriales = noDestruidos.map((m: any) => (m.serial || '').trim())
 
@@ -266,48 +359,23 @@ export const indicatorsService = {
         ).length
 
         // 3. Registros históricos: un registro por evento de reparación (deduplicado por codigo_molde + fecha_entrada)
-        const { data: histRaw } = await supabase
-            .from('base_datos_historico_moldes')
-            .select('codigo_molde, fecha_entrada, fecha_entrega, estado, id')
-            .in('codigo_molde', seriales)
-            .lte('fecha_entrada', dateRange.end)
+        const histRaw = await fetchAllHistorical(
+            'codigo_molde, fecha_entrada, fecha_entrega, estado, id',
+            q => q.in('codigo_molde', seriales).lte('fecha_entrada', dateRange.end),
+        )
 
-        // Deduplicar por (codigo_molde | fecha_entrada): conservar el de mayor ID
-        const eventMap: Record<string, any> = {}
-        for (const r of (histRaw || [])) {
-            const key = `${(r.codigo_molde || '').trim().toUpperCase()}|${r.fecha_entrada}`
-            if (!eventMap[key] || r.id > eventMap[key].id) eventMap[key] = r
-        }
-
-        // 4. Calcular días fuera dentro del rango para cada evento
-        const rangeStart = new Date(dateRange.start + 'T00:00:00')
-        const rangeEnd   = new Date(dateRange.end   + 'T00:00:00')
-
+        // 4. Días-calendario fuera por molde dentro del período (sin contar días repetidos)
+        const eventsBySerial = eventosPorSerial(histRaw)
         let totalDiasFuera = 0
-        for (const r of Object.values(eventMap)) {
-            const estadoNorm = (r.estado || '').toLowerCase()
-            const isRepair = estadoNorm.includes('reparacion') || estadoNorm.includes('espera')
-            if (!r.fecha_entrada || !isRepair) continue
-
-            const start  = new Date(r.fecha_entrada + 'T00:00:00')
-            const endRaw = r.fecha_entrega ? new Date(r.fecha_entrega + 'T00:00:00') : new Date(today + 'T00:00:00')
-
-            const overlapStart = start  > rangeStart ? start  : rangeStart
-            const overlapEnd   = endRaw < rangeEnd   ? endRaw : rangeEnd
-
-            if (overlapEnd < overlapStart) continue
-            const dias = Math.round((overlapEnd.getTime() - overlapStart.getTime()) / 86400000) + 1
-            totalDiasFuera += Math.max(0, dias)
+        for (const serial of seriales) {
+            totalDiasFuera += diasFueraMolde(eventsBySerial[serial.toUpperCase()] || [], periodo, today)
         }
 
-        // 5. Días del mes del período (denominador)
-        const refDate   = new Date(dateRange.end + 'T00:00:00')
-        const daysInMonth = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0).getDate()
-
+        // 5. Denominador: días del período evaluado
         const promedioDiasFuera = totalDiasFuera / totalMoldes
-        const indice = (promedioDiasFuera / daysInMonth) * 100
+        const indice = periodo.dias > 0 ? (promedioDiasFuera / periodo.dias) * 100 : 0
 
-        return { promedioDiasFuera, totalMoldes, enReparacionActual, indice, daysInMonth }
+        return { promedioDiasFuera, totalMoldes, enReparacionActual, indice, diasPeriodo: periodo.dias }
     },
 
     /**
@@ -318,10 +386,8 @@ export const indicatorsService = {
         dateRange: { start: string; end: string }
     ): Promise<IndisponibilidadRow[]> {
         const supabase = createClient()
-        const today = new Date().toISOString().split('T')[0]
-
-        const refDate = new Date(dateRange.end + 'T00:00:00')
-        const daysInMonth = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0).getDate()
+        const today = dayjs().format('YYYY-MM-DD')
+        const periodo = periodoIndisponibilidad(dateRange, today)
 
         // 1. Todos los moldes no destruidos agrupados por referencia
         const { data: allMoldes } = await supabase
@@ -350,28 +416,12 @@ export const indicatorsService = {
         }
 
         // 3. Histórico: eventos que empezaron antes del fin del rango
-        const { data: histRaw } = await supabase
-            .from('base_datos_historico_moldes')
-            .select('codigo_molde, fecha_entrada, fecha_entrega, estado, id')
-            .lte('fecha_entrada', dateRange.end)
+        const histRaw = await fetchAllHistorical(
+            'codigo_molde, fecha_entrada, fecha_entrega, estado, id',
+            q => q.lte('fecha_entrada', dateRange.end),
+        )
 
-        // Deduplicar por (codigo_molde | fecha_entrada): mayor ID gana
-        const eventMap: Record<string, any> = {}
-        for (const r of (histRaw || [])) {
-            const key = `${(r.codigo_molde || '').trim().toUpperCase()}|${r.fecha_entrada}`
-            if (!eventMap[key] || r.id > eventMap[key].id) eventMap[key] = r
-        }
-
-        // Agrupar eventos por serial
-        const eventsBySerial: Record<string, any[]> = {}
-        for (const r of Object.values(eventMap)) {
-            const serial = (r.codigo_molde || '').trim().toUpperCase()
-            if (!eventsBySerial[serial]) eventsBySerial[serial] = []
-            eventsBySerial[serial].push(r)
-        }
-
-        const rangeStart = new Date(dateRange.start + 'T00:00:00')
-        const rangeEnd   = new Date(dateRange.end   + 'T00:00:00')
+        const eventsBySerial = eventosPorSerial(histRaw)
 
         const results: IndisponibilidadRow[] = []
 
@@ -385,28 +435,14 @@ export const indicatorsService = {
             for (const serial of serials) {
                 const serialUpper = serial.toUpperCase()
                 if (activosSet.has(serialUpper)) enReparacionActual++
-
-                for (const r of (eventsBySerial[serialUpper] || [])) {
-                    const estadoNorm = (r.estado || '').toLowerCase()
-                    if (!r.fecha_entrada || !(estadoNorm.includes('reparacion') || estadoNorm.includes('espera'))) continue
-
-                    const start  = new Date(r.fecha_entrada + 'T00:00:00')
-                    const endRaw = r.fecha_entrega ? new Date(r.fecha_entrega + 'T00:00:00') : new Date(today + 'T00:00:00')
-
-                    const overlapStart = start  > rangeStart ? start  : rangeStart
-                    const overlapEnd   = endRaw < rangeEnd   ? endRaw : rangeEnd
-
-                    if (overlapEnd < overlapStart) continue
-                    const dias = Math.round((overlapEnd.getTime() - overlapStart.getTime()) / 86400000) + 1
-                    totalDiasFuera += Math.max(0, dias)
-                }
+                totalDiasFuera += diasFueraMolde(eventsBySerial[serialUpper] || [], periodo, today)
             }
 
             const promedioDiasFuera = totalDiasFuera / totalMoldes
-            const indice = (promedioDiasFuera / daysInMonth) * 100
+            const indice = periodo.dias > 0 ? (promedioDiasFuera / periodo.dias) * 100 : 0
 
             if (indice > 0) {
-                results.push({ referencia: ref, promedioDiasFuera, totalMoldes, enReparacionActual, indice, daysInMonth })
+                results.push({ referencia: ref, promedioDiasFuera, totalMoldes, enReparacionActual, indice, diasPeriodo: periodo.dias })
             }
         }
 
