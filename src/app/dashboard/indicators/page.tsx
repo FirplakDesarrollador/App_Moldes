@@ -14,6 +14,16 @@ import {
 import Navbar from '@/components/layout/Navbar'
 import DailySpecialIndicators from '@/components/DailySpecialIndicators'
 
+// Defect(s) recorded for the repair entry, shown under the mold code.
+function DefectoLine({ defectos }: { defectos?: string | null }) {
+    const text = (defectos || '').split(',').map(d => d.trim()).filter(Boolean).join(' · ')
+    return (
+        <p className={`mt-0.5 text-[10px] font-bold leading-snug ${text ? 'text-red-500' : 'text-slate-300 italic'}`}>
+            {text || 'Sin defecto registrado'}
+        </p>
+    )
+}
+
 // ── Category config ──────────────────────────────────────────────────────────
 const CATEGORIES = [
     { key: 'Todos',               label: 'Todos',               icon: BarChart3, color: 'blue'   },
@@ -574,7 +584,7 @@ export default function IndicatorsPage() {
                                                         const { dot, badge } = tagColors[m.tag]; const tagLabel = m.tag === 'ambos' ? 'Comp+Entr' : m.tag === 'comprometido' ? 'Comprometido' : 'Entregado'
                                                         return (
                                                             <tr key={`gen-${m.id}-${i}`} className="hover:bg-slate-50/60 transition-colors">
-                                                                <td className="py-4 px-6"><div className="flex items-start gap-2"><span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${dot}`}></span><div><p className="text-xs font-black text-slate-900 uppercase leading-normal">{m.nombre_articulo}</p><p className="text-[10px] font-mono text-slate-400">{m.serial}</p></div></div></td>
+                                                                <td className="py-4 px-6"><div className="flex items-start gap-2"><span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${dot}`}></span><div><p className="text-xs font-black text-slate-900 uppercase leading-normal">{m.nombre_articulo}</p><p className="text-[10px] font-mono text-slate-400">{m.serial}</p><DefectoLine defectos={m.defectos} /></div></div></td>
                                                                 <td className="py-4 px-6 text-xs text-slate-500">{m.fecha_esperada ? new Date(m.fecha_esperada + 'T00:00:00').toLocaleDateString('es-CO') : '—'}</td>
                                                                 <td className="py-4 px-6 text-xs font-bold text-slate-700">{m.fecha_entrega ? new Date(m.fecha_entrega + 'T00:00:00').toLocaleDateString('es-CO') : '—'}</td>
                                                                 <td className="py-4 px-6"><span className="px-2 py-0.5 rounded-lg text-[8px] font-black bg-slate-100 text-slate-600 uppercase border border-slate-200">{m.estado}</span></td>
@@ -630,7 +640,7 @@ export default function IndicatorsPage() {
                                             
                                             return (
                                                 <tr key={`rap-mod-${i}`} className="hover:bg-slate-50/60 transition-colors">
-                                                    <td className="py-4 px-6"><div className="flex items-start gap-2"><span className={`mt-1.5 w-2 h-2 rounded-full ${rapidaModalType === 'esperados' ? 'bg-blue-500' : 'bg-amber-500'}`}></span><div><p className="text-xs font-black text-slate-900 uppercase leading-normal">{rowTitle}</p><p className="text-[10px] font-mono text-slate-400">{rowCode}</p></div></div></td>
+                                                    <td className="py-4 px-6"><div className="flex items-start gap-2"><span className={`mt-1.5 w-2 h-2 rounded-full ${rapidaModalType === 'esperados' ? 'bg-blue-500' : 'bg-amber-500'}`}></span><div><p className="text-xs font-black text-slate-900 uppercase leading-normal">{rowTitle}</p><p className="text-[10px] font-mono text-slate-400">{rowCode}</p><DefectoLine defectos={m.defectos} /></div></div></td>
                                                     <td className="py-4 px-6">
                                                         <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border 
                                                             ${rowType.includes('MS') ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 
@@ -706,6 +716,7 @@ export default function IndicatorsPage() {
                                                                 <div>
                                                                     <p className="text-xs font-black text-slate-900 dark:text-white uppercase leading-normal">{m.nombre_articulo}</p>
                                                                     <p className="text-[10px] font-mono text-slate-400">{m.serial}</p>
+                                                                    <DefectoLine defectos={m.defectos} />
                                                                 </div>
                                                             </div>
                                                         </td>
