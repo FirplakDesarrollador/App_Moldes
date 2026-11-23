@@ -209,6 +209,8 @@ export default function MoldsModule() {
 
         if (tipo === 'MOLDE NUEVO' || obs.includes('MOLDE NUEVO')) return 'Molde nuevo'
         if (tipoRep.includes('MODELO') || obs.includes('MODELO NUEVO')) return 'Modelo nuevo'
+        // Desmanchado va antes que Rápida/Especial: el trigger automático lo guarda como tipo 'Rapida'
+        if (def.includes('DESMANCH') || tipoRep.includes('DESMANCH') || obs.includes('DESMANCHAR')) return 'Desmanchado'
         if (tipoRep.includes('RAPIDA') || tipoRep.includes('RÁPIDA')) return 'Reparación rápida'
         if (tipoRep.includes('ESPECIAL') || obs.includes('ESPECIAL')) return 'Reparación especial'
         if (tipoRep.includes('DESMANCHADO') || def.includes('DESMANCHADO') || obs.includes('DESMANCHAR')) return 'Desmanchado'
@@ -228,6 +230,8 @@ export default function MoldsModule() {
                 return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
             case 'Modelo nuevo':
                 return 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20'
+            case 'Desmanchado automático':
+                return 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/40 ring-1 ring-cyan-500/30'
             case 'Desmanchado':
                 return 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20'
             default:

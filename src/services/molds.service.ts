@@ -56,6 +56,18 @@ function normalizeRepairType(val: any): string {
     return str;
 }
 
+export const AUTO_DESMANCHADO_PENDING = 'Sistema Automático'
+export const AUTO_DESMANCHADO_IN_PROGRESS = 'Sistema Automático · SAP en proceso'
+export const AUTO_DESMANCHADO_DONE = 'Sistema Automático · SAP notificado'
+
+/** true si el registro lo abrió o actualizó el trigger automático de desmanchado */
+export function isAutoDesmanchado(r: any): boolean {
+    const def = String(r?.defectos_a_reparar ?? r?.['DEFECTOS A REPARAR'] ?? '').toLowerCase()
+    if (!def.includes('desmanch')) return false
+    const by = `${r?.['Modified By'] || ''}|${r?.['Created By'] || ''}`.toLowerCase()
+    return by.includes('sistema autom')
+}
+
 export const moldsService = {
     async checkActiveRepairsForMold(codigoMolde: string): Promise<{ tipo: string; estado: string }[]> {
         const supabase = createClient()
@@ -194,7 +206,7 @@ export const moldsService = {
         if (codigosUnicos.length > 0) {
             const response = await supabase
                 .from('BD_moldes')
-                .select('"CODIGO MOLDE", "ESTADO", "Tipo de reparacion", "Responsable", "FECHA ENTRADA"')
+                .select('"CODIGO MOLDE", "ESTADO", "Tipo de reparacion", "Responsable", "DEFECTOS A REPARAR", "FECHA ENTRADA", "FECHA ESPERADA", "FECHA ENTREGA", "OBSERVACIONES", repair_event_id')
                 .in('"CODIGO MOLDE"', codigosUnicos)
                 .order('"FECHA ENTRADA"', { ascending: false })
 
@@ -241,7 +253,13 @@ export const moldsService = {
                 id: m.id,
                 titulo: tituloKey || tituloPorCodigo[codigoKey] || m.titulo,
                 codigo_molde: m.codigo_molde,
-                defectos_a_reparar: m.defectos_a_reparar,
+                // El ingreso actual es la fuente; el histórico conserva reparaciones anteriores.
+                defectos_a_reparar: bdMoldesMap[codigoKey] ? bdRecord["DEFECTOS A REPARAR"] : m.defectos_a_reparar,
+                fecha_entrada: bdMoldesMap[codigoKey] ? bdRecord["FECHA ENTRADA"] : m.fecha_entrada,
+                fecha_esperada: bdMoldesMap[codigoKey] ? bdRecord["FECHA ESPERADA"] : m.fecha_esperada,
+                fecha_entrega: bdMoldesMap[codigoKey] ? bdRecord["FECHA ENTREGA"] : m.fecha_entrega,
+                observaciones: bdMoldesMap[codigoKey] ? bdRecord["OBSERVACIONES"] : m.observaciones,
+                repair_event_id: bdMoldesMap[codigoKey] ? bdRecord.repair_event_id : m.repair_event_id,
                 // Estado, tipo y responsable del registro MÁS RECIENTE en BD_moldes
                 estado: bdRecord["ESTADO"] || m.estado || '',
                 tipo_de_reparacion: bdRecord["Tipo de reparacion"] || m.tipo_de_reparacion || '',
@@ -523,7 +541,7 @@ export const moldsService = {
         let query = supabase
             .from('BD_moldes')
             .select('*')
-            .order('"FECHA ENTRADA"', { ascending: false, nullsFirst: false })
+            .order('"FECHA ESPERADA"', { ascending: true, nullsFirst: false })
             .order('id', { ascending: false })
 
         if (search.trim()) {
@@ -588,19 +606,10 @@ export const moldsService = {
             return []
         }
 
-        // Un modelo sin código se identifica por su título exacto. Esto evita ocultar
-        // todos los modelos S/C como si fueran un único registro.
-        const seen = new Set<string>()
-        const deduped = (data || []).filter((m: any) => {
-            const titulo = (m["Título"] || '').trim()
-            const codigo = (m["CODIGO MOLDE"] || '').trim().toUpperCase()
-            const key = titulo ? `TITULO:${titulo}` : `CODIGO:${codigo}`
-            if (seen.has(key)) return false
-            seen.add(key)
-            return true
-        })
-
-        return deduped.map((m: any) => ({
+        // Cada fila es un registro independiente. No agrupar por título o código:
+        // varios moldes en reparación pueden compartir referencia o nombre.
+        // Conservar también el tamaño de página para que continúe la carga incremental.
+        return (data || []).map((m: any) => ({
             ...m,
             titulo: m["Título"],
             codigo_molde: m["CODIGO MOLDE"],
@@ -715,6 +724,80 @@ export const moldsService = {
         } else {
             console.log(`[syncMoldEstado] Molde "${codigoNorm}" → estado en moldes actualizado a: "${estadoDestino}"`)
         }
+    },
+
+    // ── notifyAutoDesmanchadoToSAP ──
+    // Los moldes que el trigger trg_auto_desmanchado_v2 manda a desmanchar quedan en BD_moldes con
+    // "Modified By" = 'Sistema Automático'. Al entrar a Registro moldes se avisa a SAP una sola vez
+    // (U_EstadoMolde = 'En reparación', el mismo estado que usan las reparaciones manuales).
+    // El marcador en "Modified By" evita avisos duplicados:
+    //   'Sistema Automático'                    → pendiente de avisar a SAP
+    //   'Sistema Automático · SAP en proceso'   → un navegador lo está avisando (se reintenta a los 5 min)
+    //   'Sistema Automático · SAP notificado'   → ya avisado
+    // Si el trigger vuelve a mandar el molde a desmanchar, pone otra vez 'Sistema Automático' y se avisa de nuevo.
+    // Si una persona guarda el registro a mano, su guardado ya actualiza SAP.
+    async notifyAutoDesmanchadoToSAP(): Promise<{ notified: string[]; failed: { codigo: string; error: string }[] }> {
+        const supabase = createClient()
+        const PENDING = AUTO_DESMANCHADO_PENDING
+        const IN_PROGRESS = AUTO_DESMANCHADO_IN_PROGRESS
+        const DONE = AUTO_DESMANCHADO_DONE
+        const result = { notified: [] as string[], failed: [] as { codigo: string; error: string }[] }
+
+        const staleBefore = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+        const { data: pending, error } = await supabase
+            .from('BD_moldes')
+            .select('id, "CODIGO MOLDE", "ESTADO", "DEFECTOS A REPARAR", "Modified By", "Modified"')
+            .ilike('DEFECTOS A REPARAR', '%desmanch%')
+            .ilike('ESTADO', '%reparaci%')
+            .or(`"Modified By".eq."${PENDING}",and("Modified By".eq."${IN_PROGRESS}","Modified".lt."${staleBefore}")`)
+            .limit(50)
+
+        if (error) {
+            console.warn('[notifyAutoDesmanchadoToSAP] Error buscando pendientes:', error.message)
+            return result
+        }
+
+        for (const row of pending || []) {
+            const codigo = String(row['CODIGO MOLDE'] || '').trim()
+            if (!codigo) continue
+
+            // Reclamar el registro de forma condicional: si otro navegador ya lo tomó, no se actualiza nada.
+            const { data: claimed } = await supabase
+                .from('BD_moldes')
+                .update({ "Modified By": IN_PROGRESS, "Modified": new Date().toISOString() })
+                .eq('id', row.id)
+                .eq('Modified By', row['Modified By'])
+                .select('id')
+            if (!claimed || claimed.length === 0) continue
+
+            let ok = false
+            let errMsg = ''
+            try {
+                const res = await fetch('/api/sap-items/update', {
+                    method: 'POST',
+                    body: JSON.stringify({ itemCode: codigo, serialNumber: codigo, estado_sap: 'En reparación' })
+                })
+                const sapRes = await res.json()
+                ok = Boolean(sapRes.success)
+                errMsg = sapRes.error || ''
+            } catch (e: any) {
+                errMsg = e?.message || 'No fue posible comunicar con SAP'
+            }
+
+            await supabase
+                .from('BD_moldes')
+                .update({ "Modified By": ok ? DONE : PENDING })
+                .eq('id', row.id)
+                .eq('Modified By', IN_PROGRESS)
+
+            if (ok) {
+                result.notified.push(codigo)
+            } else {
+                console.warn(`[notifyAutoDesmanchadoToSAP] SAP no se actualizó para ${codigo}:`, errMsg)
+                result.failed.push({ codigo, error: errMsg })
+            }
+        }
+        return result
     },
 
     // ── saveRegistro: UPSERT en BD_moldes + INSERT en histórico + sync estado en moldes ──

@@ -33,7 +33,11 @@ export default function RegistroMoldesPage() {
     const [personnelCatalog, setPersonnelCatalog] = useState<any[]>([])
     const [responsiblesList, setResponsiblesList] = useState<string[]>([])
     
-    const [offset, setOffset] = useState(0)
+    const nextOffset = useRef(0)
+    const requestVersion = useRef(0)
+    const loadingMoreRef = useRef(false)
+    const scrollContainerRef = useRef<HTMLDivElement>(null)
+    const loadMoreRef = useRef<HTMLButtonElement>(null)
     const [hasMore, setHasMore] = useState(true)
 
     // Edit/Create Modal State
@@ -68,7 +72,6 @@ export default function RegistroMoldesPage() {
     const suggestionsRef = useRef<HTMLDivElement>(null)
 
     const searchTimeout = useRef<NodeJS.Timeout | null>(null)
-    const observer = useRef<IntersectionObserver | null>(null)
 
 
     // Close suggestions on click outside
@@ -81,17 +84,6 @@ export default function RegistroMoldesPage() {
         document.addEventListener("mousedown", handleClickOutside)
         return () => document.removeEventListener("mousedown", handleClickOutside)
     }, [])
-
-    const lastElementRef = useCallback((node: HTMLTableRowElement) => {
-        if (loading || loadingMore) return
-        if (observer.current) observer.current.disconnect()
-        observer.current = new IntersectionObserver(entries => {
-            if (entries[0].isIntersecting && hasMore) {
-                setOffset(prev => prev + BATCH_SIZE)
-            }
-        })
-        if (node) observer.current.observe(node)
-    }, [loading, loadingMore, hasMore])
 
     // Load Initial Data
     useEffect(() => {
@@ -119,11 +111,14 @@ export default function RegistroMoldesPage() {
             }
         }
         loadCatalogs()
+
     }, [router])
 
     const fetchInitial = async (searchVal: string, repairType: string) => {
+        const version = ++requestVersion.current
         setLoading(true)
-        setOffset(0)
+        setHasMore(false)
+        nextOffset.current = 0
         console.log('>>> FETCH INITIAL:', { searchVal, repairType, categoryFilter, statusFilter, expectedDateFilter, deliveryDateFilter, responsibleFilter, defectFilter })
         try {
             // "Al ingresar... deben mostrarse únicamente los moldes que estén en estado de reparación"
@@ -137,21 +132,26 @@ export default function RegistroMoldesPage() {
                 defecto: defectFilter
             })
 
+            if (version !== requestVersion.current) return
             setRecords(data || [])
-            setHasMore(data?.length === BATCH_SIZE)
+            nextOffset.current = data.length
+            setHasMore(data.length === BATCH_SIZE)
         } catch (error) {
+            if (version !== requestVersion.current) return
             console.error('Error fetching data:', error)
             setRecords([])
         } finally {
-            setLoading(false)
+            if (version === requestVersion.current) setLoading(false)
         }
     }
 
-    const fetchMore = async () => {
-        if (loadingMore || !hasMore) return
+    const fetchMore = useCallback(async () => {
+        if (loading || loadingMoreRef.current || !hasMore) return
+        const version = requestVersion.current
+        loadingMoreRef.current = true
         setLoadingMore(true)
         try {
-            const data = await moldsService.getAllRegistros(BATCH_SIZE, offset, searchTerm, {
+            const data = await moldsService.getAllRegistros(BATCH_SIZE, nextOffset.current, searchTerm, {
                 repair_type: filterView === 'Todos' ? '' : filterView,
                 categoria: categoryFilter,
                 estado: statusFilter,
@@ -160,18 +160,27 @@ export default function RegistroMoldesPage() {
                 responsable: responsibleFilter,
                 defecto: defectFilter
             })
-            if (data.length < BATCH_SIZE) setHasMore(false)
+            if (version !== requestVersion.current) return
+            nextOffset.current += data.length
+            setHasMore(data.length === BATCH_SIZE)
             setRecords(prev => [...prev, ...data])
         } catch (error) {
             console.error('Error loading more:', error)
         } finally {
+            loadingMoreRef.current = false
             setLoadingMore(false)
         }
-    }
+    }, [loading, hasMore, searchTerm, filterView, categoryFilter, statusFilter, expectedDateFilter, deliveryDateFilter, responsibleFilter, defectFilter])
 
     useEffect(() => {
-        if (offset > 0) fetchMore()
-    }, [offset])
+        const target = loadMoreRef.current
+        if (!target || loading || loadingMore || !hasMore) return
+        const observer = new IntersectionObserver(entries => {
+            if (entries.some(entry => entry.isIntersecting)) void fetchMore()
+        }, { root: scrollContainerRef.current, rootMargin: '200px' })
+        observer.observe(target)
+        return () => observer.disconnect()
+    }, [fetchMore, loading, loadingMore, hasMore])
 
     useEffect(() => {
         fetchInitial(searchTerm, filterView)
@@ -198,6 +207,8 @@ export default function RegistroMoldesPage() {
 
         if (tipo === 'MOLDE NUEVO' || obs.includes('MOLDE NUEVO')) return 'Molde nuevo'
         if (tipoRep.includes('MODELO') || obs.includes('MODELO NUEVO')) return 'Modelo nuevo'
+        // Desmanchado va antes que Rápida/Especial: el trigger automático lo guarda como tipo 'Rapida'
+        if (def.includes('DESMANCH') || tipoRep.includes('DESMANCH') || obs.includes('DESMANCHAR')) return 'Desmanchado'
         if (tipoRep.includes('RAPIDA') || tipoRep.includes('RÁPIDA')) return 'Reparación rápida'
         if (tipoRep.includes('ESPECIAL')) return 'Reparación especial'
         if (tipoRep.includes('DESMANCHADO') || def.includes('DESMANCHADO') || obs.includes('DESMANCHAR')) return 'Desmanchado'
@@ -217,6 +228,8 @@ export default function RegistroMoldesPage() {
                 return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
             case 'Modelo nuevo':
                 return 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20'
+            case 'Desmanchado automático':
+                return 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/40 ring-1 ring-cyan-500/30'
             case 'Desmanchado':
                 return 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20'
             default:
@@ -262,7 +275,6 @@ export default function RegistroMoldesPage() {
     const selectSuggestion = (s: any) => {
         setSearchTerm(s.serial)
         setShowSuggestions(false)
-        fetchInitial(s.serial, filterView)
     }
 
     async function checkAndWarnActiveRepairs(codigoMolde: string) {
@@ -730,9 +742,9 @@ export default function RegistroMoldesPage() {
 
                     {/* Records Table */}
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] shadow-sm overflow-hidden min-h-[500px]">
-                        <div className="overflow-x-auto">
+                        <div ref={scrollContainerRef} className="max-h-[70vh] overflow-auto" role="region" aria-label="Moldes en reparación" tabIndex={0}>
                             <table className="w-full text-left border-collapse">
-                                <thead>
+                                <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-950">
                                     <tr className="bg-slate-50/50 dark:bg-slate-950/20 border-b border-slate-100 dark:border-slate-800">
                                         <th className="py-4 px-4 text-[10px] font-black uppercase text-slate-400 tracking-wider min-w-[200px]">Título</th>
                                         <th className="py-4 px-4 text-[10px] font-black uppercase text-slate-400 tracking-wider whitespace-nowrap">Código</th>
@@ -748,7 +760,7 @@ export default function RegistroMoldesPage() {
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 relative">
                                     {records.map((r, i) => (
-                                        <tr key={`${r.id}-${i}`} ref={i === records.length - 1 ? lastElementRef : null} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-all group">
+                                        <tr key={`${r.id}-${i}`} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-all group">
                                             <td className="py-4 px-4 align-middle font-bold text-slate-900 dark:text-white uppercase leading-snug text-xs min-w-[200px]">
                                                 {r.titulo || 'Sin Título'}
                                             </td>
@@ -803,6 +815,18 @@ export default function RegistroMoldesPage() {
                                 </tbody>
                             </table>
                             {loading && <div className="p-24 flex flex-col items-center justify-center gap-6"><Loader2 className="w-12 h-12 text-blue-500 animate-spin" /><p className="text-xs font-black uppercase tracking-[0.4em] text-slate-400">Consultando BD_moldes...</p></div>}
+                            {!loading && records.length > 0 && (
+                                <div className="p-4 flex flex-col items-center gap-2 border-t border-slate-100 dark:border-slate-800">
+                                    <p className="text-xs text-slate-500" aria-live="polite">{records.length} moldes cargados{hasMore ? ' · Hay más resultados' : ' · Fin de los resultados'}</p>
+                                    {hasMore && (
+                                        <button ref={loadMoreRef} type="button" onClick={() => void fetchMore()} disabled={loadingMore}
+                                            className="px-5 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold disabled:opacity-50 inline-flex items-center gap-2">
+                                            {loadingMore && <Loader2 className="w-4 h-4 animate-spin" />}
+                                            {loadingMore ? 'Cargando más moldes...' : 'Cargar más moldes'}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                             {!loading && records.length === 0 && <div className="p-24 text-center space-y-4"><Package className="w-12 h-12 text-slate-300 mx-auto" /><p className="text-sm font-bold text-slate-400 uppercase italic">No se encontraron moldes en reparación en BD_moldes.</p></div>}
                         </div>
                     </div>
