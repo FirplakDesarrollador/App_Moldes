@@ -1,5 +1,6 @@
 // PV_MOLDES V2.4
 import { createClient, createClientTH } from '@/lib/supabase'
+import { ensureMoldPlant } from '@/services/moldPlant.service'
 
 export interface Mold {
     id?: number
@@ -806,6 +807,8 @@ export const moldsService = {
         let saved: any
         const now = new Date().toISOString()
         const codigoMolde = (record.codigo_molde || '').trim()
+
+        await ensureMoldPlant(codigoMolde, record.titulo || '', record.planta_clasificacion)
 
         // 1. Construir el objeto para BD_moldes
         const dbRecord: any = {

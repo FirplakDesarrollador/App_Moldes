@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { X, Loader2, Save, Calendar, User, Tag, Clock, Package, Search, Plus } from 'lucide-react'
 import { moldsService, Mold } from '@/services/molds.service'
+import MoldPlantField from '@/components/molds/MoldPlantField'
 
 interface AddMoldModalProps {
     onClose: () => void
@@ -96,7 +97,7 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
             onClose()
         } catch (error) {
             console.error('Error saving mold:', error)
-            alert('No se pudo guardar el registro. Verifique la conexión.')
+            alert(error instanceof Error ? error.message : 'No se pudo guardar el registro. Verifique la conexión.')
         } finally {
             setLoading(false)
         }
@@ -123,6 +124,8 @@ export default function AddMoldModal({ onClose, onSuccess, moldToEdit }: AddMold
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-10 space-y-10 max-h-[75vh] overflow-y-auto custom-scrollbar">
+                    <MoldPlantField title={formData.nombre_articulo || ''} value={formData.planta_clasificacion || ''}
+                        onChange={value => setFormData({ ...formData, planta_clasificacion: value })} />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                         <div className="space-y-4">
                             <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-2">

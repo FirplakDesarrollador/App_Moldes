@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Package, ClipboardList, Activity, Search, Clock, Loader2, Filter, Calendar, User, Trash2, Edit2, X, Save, AlertTriangle, AlertCircle, CheckCircle2, RotateCcw } from 'lucide-react'
 import { moldsService } from '@/services/molds.service'
 import Navbar from '@/components/layout/Navbar'
+import MoldPlantField from '@/components/molds/MoldPlantField'
 import holidaysData from '@/data/colombia_festivos_2026.json'
 
 const BATCH_SIZE = 20
@@ -978,6 +979,8 @@ export default function RegistroMoldesPage() {
                                 </div>
 
                                 <div className="space-y-4">
+                                    <MoldPlantField title={editForm.titulo || ''} value={editForm.planta_clasificacion || ''}
+                                        onChange={value => setEditForm({ ...editForm, planta_clasificacion: value })} />
                                     <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">Tipo de Reparación</label>
                                     <select 
                                         className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 text-xs font-black uppercase outline-none focus:ring-4 focus:ring-blue-500/5"
