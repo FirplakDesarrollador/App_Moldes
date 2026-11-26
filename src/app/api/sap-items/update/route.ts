@@ -33,6 +33,11 @@ export async function POST(req: Request) {
             return NextResponse.json({ success: false, error: 'Faltan parámetros obligatorios de identificación (ItemCode, SerialNumber, estado_sap)' }, { status: 400 })
         }
 
+        const estadoNormalizado = String(estado_sap).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]/g, '');
+        if (estadoNormalizado === 'enesperaproduccion') {
+            return NextResponse.json({ success: true, skipped: true, reason: 'En espera de Producción: SAP conserva su estado' });
+        }
+
         // Normalizar estado para SAP
         const normalizedStatus = mapEstadoToSAP(estado_sap);
         if (!normalizedStatus) {

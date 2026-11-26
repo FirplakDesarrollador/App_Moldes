@@ -2,6 +2,8 @@
 -- TRIGGER SQL: Auto-desmanchado moldes v2
 -- ============================================================
 
+ALTER TABLE public."BD_moldes" ADD COLUMN IF NOT EXISTS auto_desmanchado_vueltas boolean NOT NULL DEFAULT false;
+
 -- 1. Crear tabla de festivos y poblarla
 CREATE TABLE IF NOT EXISTS public.festivos_colombia (
     fecha DATE PRIMARY KEY
@@ -121,13 +123,11 @@ DECLARE
     v_tiempo_desmanchado NUMERIC := 0.25;
     v_fecha_esperada DATE;
     v_id_bd BIGINT;
-    v_estado_bd TEXT;
-    v_defectos TEXT;
 BEGIN
     v_umbral := NEW."Vueltas_Desmanchado";
 
-    -- Regla 3: Si moldes.vueltas_actuales es igual a moldes."Vueltas_Desmanchado"
-    IF v_umbral IS NULL OR v_umbral <= 0 OR NEW.vueltas_actuales <> v_umbral THEN
+    -- Regla 3: salir al alcanzar o superar el umbral configurado.
+    IF v_umbral IS NULL OR v_umbral <= 0 OR NEW.vueltas_actuales IS NULL OR NEW.vueltas_actuales < v_umbral THEN
         RETURN NEW;
     END IF;
 
@@ -138,6 +138,7 @@ BEGIN
 
     -- Cambiar estado en moldes a Por desmanchar (usando cast seguro)
     NEW.estado := 'Por desmanchar'::public.estado_molde_type;
+    NEW."Estado_reparacion" := 'En espera-produccion';
 
     -- Desmanchado: 0,25 días, hora de Bogotá y siguiente día hábil tras las 14:00.
     SELECT "Tiempo" INTO v_tiempo_desmanchado
@@ -147,32 +148,30 @@ BEGIN
     IF v_tiempo_desmanchado IS NULL THEN
         v_tiempo_desmanchado := 0.25;
     END IF;
-    v_fecha_esperada := public.calcular_fecha_desmanchado(clock_timestamp());
+    v_fecha_esperada := NULL; -- Se calcula al ingresar a reparación.
 
     -- Buscar en BD_moldes el registro más adecuado (preferiblemente uno que no esté entregado)
-    SELECT id, "ESTADO", "DEFECTOS A REPARAR" INTO v_id_bd, v_estado_bd, v_defectos 
-    FROM public."BD_moldes" 
-    WHERE "CODIGO MOLDE" = NEW.serial 
-    ORDER BY 
+    SELECT id INTO v_id_bd
+    FROM public."BD_moldes"
+    WHERE "CODIGO MOLDE" = NEW.serial
+    ORDER BY
         CASE WHEN "ESTADO" ILIKE '%Entregado%' THEN 1 ELSE 0 END,
-        id DESC 
+        id DESC
     LIMIT 1;
 
     IF v_id_bd IS NOT NULL THEN
-        -- Si ya tiene ESTADO = 'En reparación' y DEFECTOS incluye 'Desmanchado', no duplicar.
-        IF NOT (v_estado_bd ILIKE 'En reparaci_n' AND v_defectos ILIKE '%Desmanchado%') THEN
-            
-            UPDATE public."BD_moldes"
-            SET "ESTADO" = 'En reparación',
-                "Tipo de reparacion" = 'Rapida',
-                "DEFECTOS A REPARAR" = 'Desmanchado',
-
-                "FECHA ENTRADA" = CURRENT_DATE,
-                "FECHA ESPERADA" = v_fecha_esperada,
-                "Modified" = NOW(),
-                "Modified By" = 'Sistema Automático'
-            WHERE id = v_id_bd;
-        END IF;
+        -- Cada nueva salida automática reemplaza todos los defectos anteriores.
+        -- La guarda de estado Por desmanchar evita reiniciar el mismo trabajo.
+        UPDATE public."BD_moldes"
+        SET "ESTADO" = 'En espera - Produccion',
+            auto_desmanchado_vueltas = true,
+            "Tipo de reparacion" = 'Rapida',
+            "DEFECTOS A REPARAR" = 'Desmanchado',
+            "FECHA ENTRADA" = CURRENT_DATE,
+            "FECHA ESPERADA" = v_fecha_esperada,
+            "Modified" = NOW(),
+            "Modified By" = 'Sistema Automático'
+        WHERE id = v_id_bd;
     ELSE
         -- Si no existe en BD_moldes, se inserta nuevo registro
         INSERT INTO public."BD_moldes" (
@@ -188,12 +187,13 @@ BEGIN
             "Created By",
             "Modified",
             "Modified By",
+            auto_desmanchado_vueltas,
             repair_event_id
         ) VALUES (
             (extract(epoch from now()) * 1000)::bigint,
             NEW.nombre_articulo,
             NEW.serial,
-            'En reparación',
+            'En espera - Produccion',
             'Desmanchado',
             'Rapida',
             CURRENT_DATE::text,
@@ -202,6 +202,7 @@ BEGIN
             'Sistema Automático',
             NOW(),
             'Sistema Automático',
+            true,
             gen_random_uuid()
         );
     END IF;

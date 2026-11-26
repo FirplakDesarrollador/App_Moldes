@@ -458,7 +458,7 @@ export default function RegistroMoldesPage() {
             if (editForm.estado === 'Destruido' || editForm.estado === 'DESTRUIDO') sapEstado = 'Baja';
 
             // 1. SUPABASE UPDATE
-            await moldsService.saveRegistro({
+            const savedRecord = await moldsService.saveRegistro({
                 ...editForm,
                 usuario: user?.Nombre || user?.NombreCompleto,
                 modified_by: user?.Nombre
@@ -468,7 +468,15 @@ export default function RegistroMoldesPage() {
             // (Only try to update SAP if we have a valid code)
             let sapSuccess = true;
             let sapErrorMessage = '';
-            if (editForm.codigo_molde) {
+            const estadoNormalizado = String(editForm.estado || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]/g, '')
+            const esperaProduccion = estadoNormalizado === 'enesperaproduccion'
+            const avisoAutomatico = savedRecord?.auto_desmanchado_vueltas && estadoNormalizado === 'enreparacion'
+            if (avisoAutomatico) {
+                const result = await moldsService.notifyAutoDesmanchadoToSAP(savedRecord.id)
+                const failure = result.failed.find(r => r.codigo === String(editForm.codigo_molde).trim())
+                if (failure) { sapSuccess = false; sapErrorMessage = failure.error }
+            }
+            if (editForm.codigo_molde && !esperaProduccion && !avisoAutomatico) {
                 try {
                     const serialSAP = String(editForm.codigo_molde).trim();
                     console.log("Serial enviado a SAP:", serialSAP);
@@ -496,7 +504,7 @@ export default function RegistroMoldesPage() {
 
             // 3. RESULT
             if (sapSuccess) {
-                alert('Registro guardado y estado actualizado en SAP correctamente');
+                alert(esperaProduccion ? 'Registro guardado en espera de Producción. SAP conserva su estado.' : 'Registro guardado y estado actualizado en SAP correctamente');
             } else {
                 alert('Registro guardado, pero falló SAP: ' + (sapErrorMessage || 'No fue posible comunicar con SAP'));
             }

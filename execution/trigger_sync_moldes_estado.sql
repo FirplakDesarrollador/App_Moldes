@@ -44,6 +44,16 @@ DECLARE
     v_defecto_bd     TEXT;
     v_estado_destino TEXT;
 BEGIN
+
+    -- La salida automática ya asigna NEW.estado en el trigger de vueltas.
+    -- Evitar actualizar la misma fila mientras ese BEFORE UPDATE sigue ejecutándose.
+    IF pg_trigger_depth() > 1
+       AND coalesce(to_jsonb(NEW)->>'auto_desmanchado_vueltas','false') = 'true'
+       AND NEW."Modified By" = 'Sistema Automático'
+       AND NEW."ESTADO" = 'En espera - Produccion' THEN
+        RETURN NEW;
+    END IF;
+
     v_codigo_molde := TRIM(NEW."CODIGO MOLDE");
     v_estado_bd    := LOWER(TRIM(COALESCE(NEW."ESTADO", '')));
     v_defecto_bd   := LOWER(TRIM(COALESCE(NEW."DEFECTOS A REPARAR", '')));

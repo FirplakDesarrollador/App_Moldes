@@ -729,7 +729,7 @@ export const moldsService = {
 
     // ── notifyAutoDesmanchadoToSAP ──
     // Los moldes que el trigger trg_auto_desmanchado_v2 manda a desmanchar quedan en BD_moldes con
-    // "Modified By" = 'Sistema Automático'. Al entrar a Registro moldes se avisa a SAP una sola vez
+    // "Modified By" = 'Sistema Automático'. Solo al estar En reparación se avisa a SAP
     // (U_EstadoMolde = 'En reparación', el mismo estado que usan las reparaciones manuales).
     // El marcador en "Modified By" evita avisos duplicados:
     //   'Sistema Automático'                    → pendiente de avisar a SAP
@@ -737,7 +737,7 @@ export const moldsService = {
     //   'Sistema Automático · SAP notificado'   → ya avisado
     // Si el trigger vuelve a mandar el molde a desmanchar, pone otra vez 'Sistema Automático' y se avisa de nuevo.
     // Si una persona guarda el registro a mano, su guardado ya actualiza SAP.
-    async notifyAutoDesmanchadoToSAP(): Promise<{ notified: string[]; failed: { codigo: string; error: string }[] }> {
+    async notifyAutoDesmanchadoToSAP(recordId?: number | string): Promise<{ notified: string[]; failed: { codigo: string; error: string }[] }> {
         const supabase = createClient()
         const PENDING = AUTO_DESMANCHADO_PENDING
         const IN_PROGRESS = AUTO_DESMANCHADO_IN_PROGRESS
@@ -745,7 +745,7 @@ export const moldsService = {
         const result = { notified: [] as string[], failed: [] as { codigo: string; error: string }[] }
 
         const staleBefore = new Date(Date.now() - 5 * 60 * 1000).toISOString()
-        const { data: pending, error } = await supabase
+        let pendingQuery = supabase
             .from('BD_moldes')
             .select('id, "CODIGO MOLDE", "ESTADO", "DEFECTOS A REPARAR", "Modified By", "Modified"')
             .ilike('DEFECTOS A REPARAR', '%desmanch%')
@@ -753,7 +753,10 @@ export const moldsService = {
             .or(`"Modified By".eq."${PENDING}",and("Modified By".eq."${IN_PROGRESS}","Modified".lt."${staleBefore}")`)
             .limit(50)
 
+        if (recordId !== undefined) pendingQuery = pendingQuery.eq('id', recordId)
+        const { data: pending, error } = await pendingQuery
         if (error) {
+            if (recordId !== undefined) throw error
             console.warn('[notifyAutoDesmanchadoToSAP] Error buscando pendientes:', error.message)
             return result
         }
@@ -768,6 +771,7 @@ export const moldsService = {
                 .update({ "Modified By": IN_PROGRESS, "Modified": new Date().toISOString() })
                 .eq('id', row.id)
                 .eq('Modified By', row['Modified By'])
+                .ilike('ESTADO', '%reparaci%')
                 .select('id')
             if (!claimed || claimed.length === 0) continue
 
@@ -827,6 +831,9 @@ export const moldsService = {
             "Modified": now,
             "Modified By": record.usuario || record.modified_by
         }
+
+        // Un nuevo trabajo manual no hereda el origen automático de un trabajo anterior.
+        if (isNew) dbRecord.auto_desmanchado_vueltas = false
 
         // 1.1 GESTIÓN DE REPAIR_EVENT_ID
         let repairEventId = record.repair_event_id;
@@ -940,7 +947,7 @@ export const moldsService = {
             codigo_molde: codigoMolde,
             defectos_a_reparar: record.defectos_a_reparar,
             fecha_entrada: record.fecha_entrada,
-            fecha_esperada: record.fecha_esperada,
+            fecha_esperada: saved?.["FECHA ESPERADA"] ?? null,
             fecha_entrega: dbRecord["FECHA ENTREGA"], // Usamos el valor ya procesado (que puede ser null)
             estado: record.estado,
             observaciones: record.observaciones,
