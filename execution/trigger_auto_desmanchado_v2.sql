@@ -127,7 +127,7 @@ BEGIN
     v_umbral := NEW."Vueltas_Desmanchado";
 
     -- Regla 3: salir al alcanzar o superar el umbral configurado.
-    IF v_umbral IS NULL OR v_umbral <= 0 OR NEW.vueltas_actuales IS NULL OR NEW.vueltas_actuales < v_umbral THEN
+    IF v_umbral IS NULL OR v_umbral <= 0 OR v_umbral = 12 OR NEW.vueltas_actuales IS NULL OR NEW.vueltas_actuales < v_umbral THEN
         RETURN NEW;
     END IF;
 

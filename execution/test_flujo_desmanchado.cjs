@@ -16,9 +16,15 @@ const {PGlite}=require('../tmp/sql-validation/node_modules/@electric-sql/pglite'
  assert.ok(migration.includes(definition),'La instalación y la migración deben usar el mismo trigger');
 
  await db.exec(source.slice(source.indexOf('-- 4. Recrear el Trigger')));
+ // El parche modifica solo la exclusión de 12 sobre la versión previamente instalada.
+ const expectedFn=(await db.query("SELECT pg_get_functiondef('public.auto_desmanchado_moldes_v2()'::regprocedure) AS value")).rows[0].value;
+ await db.exec(expectedFn.replace(' OR v_umbral = 12',''));
+ await db.exec(read('excluir_fv_desmanchado.sql'));
+ await db.exec(read('excluir_fv_desmanchado.sql'));
+ assert.equal((await db.query("SELECT pg_get_functiondef('public.auto_desmanchado_moldes_v2()'::regprocedure) AS value")).rows[0].value,expectedFn);
  const row=async(code)=>(await db.query('SELECT * FROM public."BD_moldes" WHERE "CODIGO MOLDE"=$1',[code])).rows[0];
  const count=async()=>Number((await db.query('SELECT count(*) AS n FROM public.desmanchado_salidas_diarias')).rows[0].n);
- for(const [code,turns,limit,want] of [['SALTO',21,20,true],['IGUAL',20,20,true],['MENOR',19,20,false],['CERO',1,0,false],['NULO',null,20,false]]){
+ for(const [code,turns,limit,want] of [['SALTO',21,20,true],['IGUAL',20,20,true],['MENOR',19,20,false],['CERO',1,0,false],['NULO',null,20,false],['FV-IGUAL',12,12,false],['FV-SUPERA',13,12,false]]){
   await db.query('INSERT INTO public.moldes(serial,estado,vueltas_actuales,"Vueltas_Desmanchado") VALUES ($1,$2,$3,$4)',[code,'En uso',turns,limit]);
   const r=await row(code);assert.equal(Boolean(r),want);
   if(want){assert.equal(r.ESTADO,'En espera - Produccion');assert.equal(r['FECHA ESPERADA'],null);assert.equal(r['DEFECTOS A REPARAR'],'Desmanchado');assert.equal(r['Tipo de reparacion'],'Rapida')}
@@ -114,6 +120,14 @@ const {PGlite}=require('../tmp/sql-validation/node_modules/@electric-sql/pglite'
   assert.equal((await row(code)).ESTADO,'En reparación');
   assert.equal((await row(code))['FECHA ESPERADA'],repairDate);
  }
+
+ // Al actualizar vueltas, FV permanece en su estado y no genera trabajo.
+ await db.query('INSERT INTO public.moldes(serial,estado,vueltas_actuales,"Vueltas_Desmanchado") VALUES ($1,$2,11,12)',['FV-UPDATE','En uso']);
+ await db.query('UPDATE public.moldes SET vueltas_actuales=12 WHERE serial=$1',['FV-UPDATE']);
+ await db.query('UPDATE public.moldes SET vueltas_actuales=13 WHERE serial=$1',['FV-UPDATE']);
+ assert.equal(await row('FV-UPDATE'),undefined);
+ assert.equal((await db.query('SELECT estado FROM public.moldes WHERE serial=$1',['FV-UPDATE'])).rows[0].estado,'En uso');
+ console.log('PASS: FV con límite 12 excluido en inserción/actualización, al alcanzar/superar el límite; parche mínimo e idempotente.');
  console.log('PASS: reemplazo de defectos anteriores, mezclas con Desmanchado y valores NULL; conserva trabajo ya iniciado.');
  console.log('PASS: umbral igual/superado, guardas, espera sin fecha/cupo, ingreso directo y por app, SAP pendiente, reintentos, manual intacto, cupo y calendario, reinstalación.');
  await db.close();
