@@ -196,6 +196,7 @@ BEGIN
             "DEFECTOS A REPARAR" = 'Desmanchado',
             "FECHA ENTRADA" = CURRENT_DATE,
             "FECHA ESPERADA" = v_fecha_esperada,
+            "FECHA ENTREGA" = NULL,
             "Modified" = NOW(),
             "Modified By" = 'Sistema Automático'
         WHERE id = v_id_bd;
@@ -251,6 +252,7 @@ BEGIN
     OR coalesce(NEW."DEFECTOS A REPARAR",'') NOT ILIKE '%desmanch%' THEN RETURN NEW; END IF;
  IF estado_nuevo = 'enesperaproduccion' THEN
     NEW."FECHA ESPERADA" := NULL;
+    NEW."FECHA ENTREGA" := NULL;
     RETURN NEW;
  END IF;
  IF TG_OP <> 'UPDATE' THEN RETURN NEW; END IF;

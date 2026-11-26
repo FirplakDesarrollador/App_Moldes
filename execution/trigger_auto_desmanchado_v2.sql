@@ -169,6 +169,7 @@ BEGIN
             "DEFECTOS A REPARAR" = 'Desmanchado',
             "FECHA ENTRADA" = CURRENT_DATE,
             "FECHA ESPERADA" = v_fecha_esperada,
+            "FECHA ENTREGA" = NULL,
             "Modified" = NOW(),
             "Modified By" = 'Sistema Automático'
         WHERE id = v_id_bd;

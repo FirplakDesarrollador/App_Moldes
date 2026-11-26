@@ -95,7 +95,7 @@ const {PGlite}=require('../tmp/sql-validation/node_modules/@electric-sql/pglite'
  ]){
   const code='REEMPLAZO-'+(-fixtureId);
   await db.query('INSERT INTO public.moldes(serial,estado,vueltas_actuales,"Vueltas_Desmanchado") VALUES ($1,$2,19,20)',[code,'En uso']);
-  await db.query('INSERT INTO public."BD_moldes"(id,"CODIGO MOLDE","ESTADO","DEFECTOS A REPARAR","Tipo de reparacion","FECHA ESPERADA") VALUES ($1,$2,$3,$4,$5,$6)',[fixtureId--,code,state,defects,'Especial','2030-01-01']);
+  await db.query('INSERT INTO public."BD_moldes"(id,"CODIGO MOLDE","ESTADO","DEFECTOS A REPARAR","Tipo de reparacion","FECHA ESPERADA","FECHA ENTREGA") VALUES ($1,$2,$3,$4,$5,$6,$7)',[fixtureId--,code,state,defects,'Especial','2030-01-01','2026-09-25']);
   // El molde está en planta; BD_moldes conserva el registro del trabajo anterior.
   // Preparar el estado de producción después de cargar el registro histórico.
   await db.query('UPDATE public.moldes SET estado=$1 WHERE serial=$2',['En uso',code]);
@@ -105,6 +105,7 @@ const {PGlite}=require('../tmp/sql-validation/node_modules/@electric-sql/pglite'
   assert.equal(replaced.ESTADO,'En espera - Produccion');
   assert.equal(replaced['Tipo de reparacion'],'Rapida');
   assert.equal(replaced['FECHA ESPERADA'],null);
+  assert.equal(replaced['FECHA ENTREGA'],null);
   assert.equal(replaced.auto_desmanchado_vueltas,true);
   // Otro reporte de vueltas no altera un trabajo que ya ingresó a reparación.
   await db.query('UPDATE public."BD_moldes" SET "ESTADO"=$1 WHERE "CODIGO MOLDE"=$2',['En reparación',code]);
