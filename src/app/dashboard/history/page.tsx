@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Package, ClipboardList, Activity, Search, Clock, Loader2, Filter, Calendar, User, Trash2, Edit2, X, Save, AlertTriangle, AlertCircle, CheckCircle2, RotateCcw } from 'lucide-react'
+import { Package, ClipboardList, Activity, Search, Clock, Loader2, Filter, Calendar, Trash2, Edit2, X, Save, AlertTriangle, AlertCircle, CheckCircle2, RotateCcw } from 'lucide-react'
 import { moldsService } from '@/services/molds.service'
 import Navbar from '@/components/layout/Navbar'
 import MoldPlantField from '@/components/molds/MoldPlantField'
@@ -25,14 +25,11 @@ export default function RegistroMoldesPage() {
     const [categoryFilter, setCategoryFilter] = useState('')
     const [statusFilter, setStatusFilter] = useState('')
     const [expectedDateFilter, setExpectedDateFilter] = useState('')
-    const [deliveryDateFilter, setDeliveryDateFilter] = useState('')
-    const [responsibleFilter, setResponsibleFilter] = useState('')
     const [defectFilter, setDefectFilter] = useState('')
 
     // Catalogs State
     const [defectsCatalog, setDefectsCatalog] = useState<any[]>([])
     const [personnelCatalog, setPersonnelCatalog] = useState<any[]>([])
-    const [responsiblesList, setResponsiblesList] = useState<string[]>([])
     
     const nextOffset = useRef(0)
     const requestVersion = useRef(0)
@@ -97,16 +94,12 @@ export default function RegistroMoldesPage() {
 
         const loadCatalogs = async () => {
             try {
-                const [defects, personnel, responsibles] = await Promise.all([
+                const [defects, personnel] = await Promise.all([
                     moldsService.getDefectsCatalog(),
-                    moldsService.getPersonnel(),
-                    moldsService.getRegistroResponsables()
+                    moldsService.getPersonnel()
                 ])
                 setDefectsCatalog(defects || [])
                 setPersonnelCatalog(personnel || [])
-                if (responsibles && responsibles.length > 0) {
-                    setResponsiblesList(responsibles)
-                }
             } catch (error) {
                 console.error('Error loading catalogs:', error)
             }
@@ -120,7 +113,7 @@ export default function RegistroMoldesPage() {
         setLoading(true)
         setHasMore(false)
         nextOffset.current = 0
-        console.log('>>> FETCH INITIAL:', { searchVal, repairType, categoryFilter, statusFilter, expectedDateFilter, deliveryDateFilter, responsibleFilter, defectFilter })
+        console.log('>>> FETCH INITIAL:', { searchVal, repairType, categoryFilter, statusFilter, expectedDateFilter, defectFilter })
         try {
             // "Al ingresar... deben mostrarse únicamente los moldes que estén en estado de reparación"
             const data = await moldsService.getAllRegistros(BATCH_SIZE, 0, searchVal, {
@@ -128,8 +121,6 @@ export default function RegistroMoldesPage() {
                 categoria: categoryFilter,
                 estado: statusFilter,
                 fecha_esperada: expectedDateFilter,
-                fecha_entrega: deliveryDateFilter,
-                responsable: responsibleFilter,
                 defecto: defectFilter
             })
 
@@ -157,8 +148,6 @@ export default function RegistroMoldesPage() {
                 categoria: categoryFilter,
                 estado: statusFilter,
                 fecha_esperada: expectedDateFilter,
-                fecha_entrega: deliveryDateFilter,
-                responsable: responsibleFilter,
                 defecto: defectFilter
             })
             if (version !== requestVersion.current) return
@@ -171,7 +160,7 @@ export default function RegistroMoldesPage() {
             loadingMoreRef.current = false
             setLoadingMore(false)
         }
-    }, [loading, hasMore, searchTerm, filterView, categoryFilter, statusFilter, expectedDateFilter, deliveryDateFilter, responsibleFilter, defectFilter])
+    }, [loading, hasMore, searchTerm, filterView, categoryFilter, statusFilter, expectedDateFilter, defectFilter])
 
     useEffect(() => {
         const target = loadMoreRef.current
@@ -185,18 +174,16 @@ export default function RegistroMoldesPage() {
 
     useEffect(() => {
         fetchInitial(searchTerm, filterView)
-    }, [searchTerm, filterView, categoryFilter, statusFilter, expectedDateFilter, deliveryDateFilter, responsibleFilter, defectFilter])
+    }, [searchTerm, filterView, categoryFilter, statusFilter, expectedDateFilter, defectFilter])
 
     const hasActiveFilters = Boolean(
-        categoryFilter || statusFilter || expectedDateFilter || deliveryDateFilter || responsibleFilter || defectFilter
+        categoryFilter || statusFilter || expectedDateFilter || defectFilter
     )
 
     const resetFilters = () => {
         setCategoryFilter('')
         setStatusFilter('')
         setExpectedDateFilter('')
-        setDeliveryDateFilter('')
-        setResponsibleFilter('')
         setDefectFilter('')
     }
 
@@ -623,8 +610,8 @@ export default function RegistroMoldesPage() {
 
                         {/* Complementary Filters */}
                         <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800/80 space-y-3.5">
-                            {/* Row 1: Categoría, Estado, Responsable */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                            {/* Row 1: Categoría y Estado */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                                 {/* Categoría */}
                                 <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 relative group">
                                     <Filter className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 pointer-events-none" />
@@ -661,30 +648,11 @@ export default function RegistroMoldesPage() {
                                     <label className="absolute -top-2 left-5 px-2 bg-white dark:bg-[#0f172a] text-[9px] font-black text-blue-500 uppercase tracking-widest">Estado</label>
                                 </div>
 
-                                {/* Responsable */}
-                                <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 relative group">
-                                    <User className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 pointer-events-none" />
-                                    <select
-                                        className="w-full bg-transparent border-0 py-2 pl-9 pr-3 text-xs font-bold text-slate-900 dark:text-white outline-none cursor-pointer"
-                                        value={responsibleFilter}
-                                        onChange={(e) => setResponsibleFilter(e.target.value)}
-                                    >
-                                        <option value="" className="dark:bg-slate-900">Todos los responsables</option>
-                                        {Array.from(new Set([
-                                            ...responsiblesList,
-                                            ...personnelCatalog.map(p => p.NombreCompleto || p.Nombre).filter(Boolean)
-                                        ])).sort((a: string, b: string) => a.localeCompare(b)).map((resp) => (
-                                            <option key={resp} value={resp} className="dark:bg-slate-900">
-                                                {resp}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <label className="absolute -top-2 left-5 px-2 bg-white dark:bg-[#0f172a] text-[9px] font-black text-blue-500 uppercase tracking-widest">Responsable</label>
-                                </div>
+
                             </div>
 
-                            {/* Row 2: Defecto, F. Esperada, F. Real Entrega, Contador y Limpiar */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                            {/* Row 2: Defecto, F. Esperada, Contador y Limpiar */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                                 {/* Defecto */}
                                 <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 relative group">
                                     <AlertCircle className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500" />
@@ -710,17 +678,7 @@ export default function RegistroMoldesPage() {
                                     <label className="absolute -top-2 left-5 px-2 bg-white dark:bg-[#0f172a] text-[9px] font-black text-blue-500 uppercase tracking-widest">F. Esperada</label>
                                 </div>
 
-                                {/* F. Real Entrega */}
-                                <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 relative group">
-                                    <CheckCircle2 className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-green-500 pointer-events-none" />
-                                    <input
-                                        type="date"
-                                        className="w-full bg-transparent border-0 py-2 pl-9 pr-3 text-xs font-bold text-slate-900 dark:text-white outline-none cursor-pointer"
-                                        value={deliveryDateFilter}
-                                        onChange={(e) => setDeliveryDateFilter(e.target.value)}
-                                    />
-                                    <label className="absolute -top-2 left-5 px-2 bg-white dark:bg-[#0f172a] text-[9px] font-black text-green-500 uppercase tracking-widest">F. Real Entrega</label>
-                                </div>
+
 
                                 {/* Estado de Filtros & Limpiar */}
                                 <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
