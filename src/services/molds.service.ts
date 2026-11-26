@@ -25,6 +25,15 @@ export interface Mold {
     [key: string]: any
 }
 
+
+export interface MoldProximoDesmanchado {
+    id: number
+    serial: string | null
+    nombre_articulo: string | null
+    vueltas_actuales: number
+    Vueltas_Desmanchado: number
+}
+
 export interface MoldActive {
     [key: string]: any
     id?: any
@@ -70,6 +79,37 @@ export function isAutoDesmanchado(r: any): boolean {
 }
 
 export const moldsService = {
+
+    async getMoldesProximosDesmanchar(): Promise<MoldProximoDesmanchado[]> {
+        const supabase = createClient()
+        const matches: MoldProximoDesmanchado[] = []
+        const pageSize = 500
+
+        // PostgREST no compara columnas entre sí: revisar todas las páginas
+        // y aplicar la igualdad exacta, sin restringir el estado del molde.
+        for (let offset = 0; ; offset += pageSize) {
+            const { data, error } = await supabase
+                .from('moldes')
+                .select('id, serial, nombre_articulo, vueltas_actuales, Vueltas_Desmanchado')
+                .gt('Vueltas_Desmanchado', 0)
+                .order('id', { ascending: true })
+                .range(offset, offset + pageSize - 1)
+
+            if (error) throw error
+            const page = data || []
+            matches.push(...page.filter((m: any) =>
+                m.vueltas_actuales !== null &&
+                m.Vueltas_Desmanchado !== null &&
+                m.Vueltas_Desmanchado > 0 &&
+                m.vueltas_actuales === m.Vueltas_Desmanchado - 1
+            ))
+            if (page.length < pageSize) break
+        }
+
+        return matches.sort((a, b) => (a.serial || '').localeCompare(b.serial || ''))
+    },
+
+
     async checkActiveRepairsForMold(codigoMolde: string): Promise<{ tipo: string; estado: string }[]> {
         const supabase = createClient()
         const ACTIVE_STATES = [

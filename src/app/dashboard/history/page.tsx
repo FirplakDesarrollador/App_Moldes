@@ -7,6 +7,7 @@ import { Package, ClipboardList, Activity, Search, Clock, Loader2, Filter, Calen
 import { moldsService } from '@/services/molds.service'
 import Navbar from '@/components/layout/Navbar'
 import MoldPlantField from '@/components/molds/MoldPlantField'
+import MoldesProximosDesmanchar from '@/components/molds/MoldesProximosDesmanchar'
 import holidaysData from '@/data/colombia_festivos_2026.json'
 
 const BATCH_SIZE = 20
@@ -576,6 +577,8 @@ export default function RegistroMoldesPage() {
                                 </button>
                             </div>
                         </div>
+
+                        <MoldesProximosDesmanchar />
 
                         {/* Search Bar - Upgraded to Autocomplete pointing to 'moldes' table per Requirement 2.2 */}
                         <div className="mt-6 relative group">
