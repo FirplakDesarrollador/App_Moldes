@@ -101,6 +101,7 @@ export const moldsService = {
                 m.vueltas_actuales !== null &&
                 m.Vueltas_Desmanchado !== null &&
                 m.Vueltas_Desmanchado > 0 &&
+                m.Vueltas_Desmanchado !== 12 &&
                 m.vueltas_actuales === m.Vueltas_Desmanchado - 1
             ))
             if (page.length < pageSize) break
